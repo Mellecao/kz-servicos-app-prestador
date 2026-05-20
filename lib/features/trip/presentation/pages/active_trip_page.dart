@@ -1,14 +1,15 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/constants/map_styles.dart';
 import 'package:kz_servicos_prestador/core/utils/custom_map_markers.dart';
 import 'package:kz_servicos_prestador/core/utils/route_pulse_animator.dart';
 import 'package:kz_servicos_prestador/core/widgets/circle_button.dart';
-import 'package:kz_servicos_prestador/features/trip/data/models/mock_trip_request.dart';
+import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
 import 'package:kz_servicos_prestador/features/trip/data/services/directions_service.dart';
 import 'package:kz_servicos_prestador/features/trip/domain/trip_phase.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/helpers/external_nav_helper.dart';
@@ -16,8 +17,8 @@ import 'package:kz_servicos_prestador/features/trip/presentation/widgets/active_
 import 'package:kz_servicos_prestador/features/trip/presentation/widgets/phase_badge.dart';
 
 class ActiveTripPage extends StatefulWidget {
-  final MockTripRequest request;
-  const ActiveTripPage({super.key, required this.request});
+  final ActiveTripData trip;
+  const ActiveTripPage({super.key, required this.trip});
 
   @override
   State<ActiveTripPage> createState() => _ActiveTripPageState();
@@ -25,22 +26,31 @@ class ActiveTripPage extends StatefulWidget {
 
 class _ActiveTripPageState extends State<ActiveTripPage>
     with TickerProviderStateMixin {
+  final _supabase = Supabase.instance.client;
+
   TripPhase _phase = TripPhase.navigatingToClient;
   GoogleMapController? _mapController;
   int _clientRating = 0;
   Set<Polyline> _polylines = {};
   Set<Marker> _markers = {};
   final _directionsService = DirectionsService();
+
   LatLng _currentLocation = const LatLng(-23.5505, -46.6333);
   double _currentHeading = 0;
   StreamSubscription<Position>? _positionStream;
+  Timer? _gpsPublishTimer;
   RoutePulseAnimator? _pulseAnimator;
+
   BitmapDescriptor? _yellowPinIcon;
   BitmapDescriptor? _yellowCircleIcon;
-  BitmapDescriptor? _driverIcon;
+  BitmapDescriptor? _blueTriangleIcon;
 
-  LatLng get _pickup => LatLng(widget.request.originLat, widget.request.originLng);
-  LatLng get _destination => LatLng(widget.request.destinationLat, widget.request.destinationLng);
+  bool _showArrivedPopup = false;
+
+  LatLng get _pickup =>
+      LatLng(widget.trip.pickupLat, widget.trip.pickupLng);
+  LatLng get _destination =>
+      LatLng(widget.trip.destinationLat, widget.trip.destinationLng);
 
   @override
   void initState() {
@@ -48,11 +58,13 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     _pulseAnimator = RoutePulseAnimator(vsync: this, onTick: _onPulseTick);
     _initIcons();
     _initLocationTracking();
+    _startGpsPublishing();
   }
 
   @override
   void dispose() {
     _positionStream?.cancel();
+    _gpsPublishTimer?.cancel();
     _pulseAnimator?.dispose();
     super.dispose();
   }
@@ -61,20 +73,20 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     final results = await Future.wait([
       CustomMapMarkers.createYellowPinIcon(),
       CustomMapMarkers.createYellowCircleIcon(),
-      CustomMapMarkers.createDriverLocationIcon(),
+      CustomMapMarkers.createBlueTriangleIcon(),
     ]);
     _yellowPinIcon = results[0];
     _yellowCircleIcon = results[1];
-    _driverIcon = results[2];
+    _blueTriangleIcon = results[2];
     _rebuildMarkers();
     _fetchRouteForPhase();
   }
 
   Future<void> _initLocationTracking() async {
     try {
-      final permission = await Geolocator.checkPermission();
+      var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        await Geolocator.requestPermission();
+        permission = await Geolocator.requestPermission();
       }
       final pos = await Geolocator.getCurrentPosition(
         locationSettings:
@@ -86,12 +98,39 @@ class _ActiveTripPageState extends State<ActiveTripPage>
       _rebuildMarkers();
       _updateCamera();
     } catch (_) {}
+
     _positionStream = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 5,
       ),
     ).listen(_onPositionUpdate);
+  }
+
+  void _startGpsPublishing() {
+    _gpsPublishTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _publishLocation();
+    });
+  }
+
+  Future<void> _publishLocation() async {
+    if (!_phase.isGpsMode) return;
+    try {
+      final userId = _supabase.auth.currentUser!.id;
+      final driverProfile = await _supabase
+          .from('driver_profiles')
+          .select('id')
+          .eq('provider_profile_id', userId)
+          .single();
+      await _supabase.from('driver_locations').upsert({
+        'driver_profile_id': driverProfile['id'] as String,
+        'latitude': _currentLocation.latitude,
+        'longitude': _currentLocation.longitude,
+        'heading': _currentHeading,
+        'speed': 0.0,
+        'trip_id': widget.trip.id,
+      }, onConflict: 'driver_profile_id');
+    } catch (_) {}
   }
 
   void _onPositionUpdate(Position position) {
@@ -118,11 +157,12 @@ class _ActiveTripPageState extends State<ActiveTripPage>
 
   void _rebuildMarkers() {
     final markers = <Marker>{};
-    if (_driverIcon != null) {
+    if (_blueTriangleIcon != null) {
       markers.add(Marker(
         markerId: const MarkerId('driver'),
         position: _currentLocation,
-        icon: _driverIcon!,
+        icon: _blueTriangleIcon!,
+        rotation: _currentHeading,
         anchor: const Offset(0.5, 0.5),
         zIndexInt: 10,
       ));
@@ -147,14 +187,11 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   Future<void> _fetchRouteForPhase() async {
     _pulseAnimator?.stop();
     LatLng target;
-    Color routeColor;
     switch (_phase) {
       case TripPhase.navigatingToClient:
         target = _pickup;
-        routeColor = AppColors.secondary;
       case TripPhase.tripInProgress:
         target = _destination;
-        routeColor = AppColors.highlight;
       default:
         setState(() => _polylines = {});
         return;
@@ -169,13 +206,13 @@ class _ActiveTripPageState extends State<ActiveTripPage>
         Polyline(
           polylineId: const PolylineId('route_glow'),
           points: points,
-          color: routeColor.withValues(alpha: 0.18),
+          color: AppColors.highlight.withValues(alpha: 0.18),
           width: 10,
         ),
         Polyline(
           polylineId: const PolylineId('route'),
           points: points,
-          color: routeColor,
+          color: AppColors.highlight,
           width: 5,
         ),
       };
@@ -196,35 +233,47 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     });
   }
 
-  void _advancePhase() {
-    setState(() {
-      _phase = switch (_phase) {
-        TripPhase.navigatingToClient => TripPhase.arrivedAtClient,
-        TripPhase.arrivedAtClient => TripPhase.tripInProgress,
-        TripPhase.tripInProgress => TripPhase.tripCompleted,
-        TripPhase.tripCompleted => TripPhase.tripCompleted,
-      };
-    });
-    switch (_phase) {
-      case TripPhase.arrivedAtClient:
-        _pulseAnimator?.stop();
-        setState(() => _polylines = {});
-        _mapController?.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(target: _pickup, zoom: 15),
-          ),
-        );
-      case TripPhase.tripInProgress: _fetchRouteForPhase();
-      case TripPhase.tripCompleted:
-        _pulseAnimator?.stop(); _positionStream?.cancel();
-        setState(() => _polylines = {});
-      default: break;
+  Future<void> _advancePhase() async {
+    if (_phase == TripPhase.navigatingToClient) {
+      await _supabase
+          .from('trips')
+          .update({'driver_arrived_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('id', widget.trip.id);
+      setState(() {
+        _phase = TripPhase.arrivedAtClient;
+        _showArrivedPopup = true;
+      });
+      _pulseAnimator?.stop();
+      setState(() => _polylines = {});
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: _pickup, zoom: 15),
+        ),
+      );
+    } else if (_phase == TripPhase.arrivedAtClient) {
+      await _supabase
+          .from('trips')
+          .update({'started_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('id', widget.trip.id);
+      setState(() {
+        _phase = TripPhase.tripInProgress;
+        _showArrivedPopup = false;
+      });
+      _fetchRouteForPhase();
+    } else if (_phase == TripPhase.tripInProgress) {
+      setState(() => _phase = TripPhase.tripCompleted);
+      _pulseAnimator?.stop();
+      _positionStream?.cancel();
+      _gpsPublishTimer?.cancel();
+      setState(() => _polylines = {});
     }
   }
 
   LatLng get _navTarget =>
-      (_phase == TripPhase.navigatingToClient || _phase == TripPhase.arrivedAtClient)
-          ? _pickup : _destination;
+      (_phase == TripPhase.navigatingToClient ||
+              _phase == TripPhase.arrivedAtClient)
+          ? _pickup
+          : _destination;
 
   @override
   Widget build(BuildContext context) {
@@ -272,29 +321,47 @@ class _ActiveTripPageState extends State<ActiveTripPage>
                 onTap: () => showExternalNavSheet(context, _navTarget),
               ),
             ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _phase == TripPhase.tripCompleted
-                ? TripCompletedPanel(
-                    price: widget.request.estimatedPrice,
-                    rating: _clientRating,
-                    onRatingChanged: (r) =>
-                        setState(() => _clientRating = r),
-                    onFinish: () => context.go('/home'),
-                  )
-                : ActiveTripPanel(
-                    clientName: widget.request.clientName,
-                    // TODO Task 6: Pass ActiveTripData instead of widget.request
-                    subtitle: _phase.subtitle(widget.request as dynamic),
-                    phaseColor: _phase.color,
-                    buttonLabel: _phase.buttonLabel,
-                    onAdvance: _advancePhase,
-                    onChat: () => context.push('/chat/0'),
-                    onCall: () {},
-                  ),
-          ),
+          if (_showArrivedPopup)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              // TODO Task 7: Replace with ArrivedAtClientPanel(trip: widget.trip, onStart: _advancePhase)
+              child: ActiveTripPanel(
+                clientName: widget.trip.clientName,
+                subtitle: _phase.subtitle(widget.trip),
+                phaseColor: _phase.color,
+                buttonLabel: _phase.buttonLabel,
+                onAdvance: _advancePhase,
+                onChat: () => context.push('/chat/0'),
+                onCall: () {},
+              ),
+            )
+          else
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _phase == TripPhase.tripCompleted
+                  ? TripCompletedPanel(
+                      price: widget.trip.offeredPrice,
+                      rating: _clientRating,
+                      onRatingChanged: (r) =>
+                          setState(() => _clientRating = r),
+                      onFinish: () => context.go('/home'),
+                    )
+                  : _phase != TripPhase.arrivedAtClient
+                      ? ActiveTripPanel(
+                          clientName: widget.trip.clientName,
+                          subtitle: _phase.subtitle(widget.trip),
+                          phaseColor: _phase.color,
+                          buttonLabel: _phase.buttonLabel,
+                          onAdvance: _advancePhase,
+                          onChat: () => context.push('/chat/0'),
+                          onCall: () {},
+                        )
+                      : const SizedBox.shrink(),
+            ),
         ],
       ),
     );

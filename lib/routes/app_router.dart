@@ -15,7 +15,7 @@ import 'package:kz_servicos_prestador/features/profile/data/models/mock_provider
 import 'package:kz_servicos_prestador/features/profile/presentation/pages/profile_page.dart';
 import 'package:kz_servicos_prestador/features/profile/presentation/pages/security_settings_page.dart';
 import 'package:kz_servicos_prestador/features/splash/presentation/pages/splash_page.dart';
-import 'package:kz_servicos_prestador/features/trip/data/models/mock_trip_request.dart';
+import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/pages/active_trip_page.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/pages/trip_history_detail_page.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/pages/trip_history_page.dart';
@@ -74,9 +74,8 @@ class AppRouter {
       GoRoute(
         path: '/active-trip',
         builder: (context, state) {
-          final request =
-              state.extra as MockTripRequest? ?? MockTripRequest.pendingRequests.first;
-          return ActiveTripPage(request: request);
+          final trip = state.extra as ActiveTripData;
+          return ActiveTripPage(trip: trip);
         },
       ),
       GoRoute(
