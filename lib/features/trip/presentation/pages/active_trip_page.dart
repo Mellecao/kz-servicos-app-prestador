@@ -286,7 +286,8 @@ class _ActiveTripPageState extends State<ActiveTripPage>
                   )
                 : ActiveTripPanel(
                     clientName: widget.request.clientName,
-                    subtitle: _phase.subtitle(widget.request),
+                    // TODO Task 6: Pass ActiveTripData instead of widget.request
+                    subtitle: _phase.subtitle(widget.request as dynamic),
                     phaseColor: _phase.color,
                     buttonLabel: _phase.buttonLabel,
                     onAdvance: _advancePhase,

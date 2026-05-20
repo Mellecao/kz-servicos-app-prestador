@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
-import 'package:kz_servicos_prestador/features/trip/data/models/mock_trip_request.dart';
+import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
 
 enum TripPhase {
   navigatingToClient,
@@ -17,12 +17,11 @@ extension TripPhaseProperties on TripPhase {
         TripPhase.tripCompleted => 'Viagem finalizada',
       };
 
-  String subtitle(MockTripRequest request) => switch (this) {
-        TripPhase.navigatingToClient => request.origin,
-        TripPhase.arrivedAtClient => 'Aguardando ${request.clientName}',
-        TripPhase.tripInProgress => request.destination,
-        TripPhase.tripCompleted =>
-          'R\$ ${request.estimatedPrice.toStringAsFixed(2)}',
+  String subtitle(ActiveTripData trip) => switch (this) {
+        TripPhase.navigatingToClient => trip.pickupAddress,
+        TripPhase.arrivedAtClient => 'Aguardando ${trip.clientName}',
+        TripPhase.tripInProgress => trip.destinationAddress,
+        TripPhase.tripCompleted => 'R\$ ${trip.offeredPrice.toStringAsFixed(2)}',
       };
 
   Color get color => switch (this) {
@@ -47,8 +46,7 @@ extension TripPhaseProperties on TripPhase {
       };
 
   bool get isGpsMode =>
-      this == TripPhase.navigatingToClient ||
-      this == TripPhase.tripInProgress;
+      this == TripPhase.navigatingToClient || this == TripPhase.tripInProgress;
 
   bool get isActive => this != TripPhase.tripCompleted;
 }
