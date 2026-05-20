@@ -326,15 +326,9 @@ class _ActiveTripPageState extends State<ActiveTripPage>
               bottom: 0,
               left: 0,
               right: 0,
-              // TODO Task 7: Replace with ArrivedAtClientPanel(trip: widget.trip, onStart: _advancePhase)
-              child: ActiveTripPanel(
-                clientName: widget.trip.clientName,
-                subtitle: _phase.subtitle(widget.trip),
-                phaseColor: _phase.color,
-                buttonLabel: _phase.buttonLabel,
-                onAdvance: _advancePhase,
-                onChat: () => context.push('/chat/0'),
-                onCall: () {},
+              child: ArrivedAtClientPanel(
+                trip: widget.trip,
+                onStart: _advancePhase,
               ),
             )
           else
