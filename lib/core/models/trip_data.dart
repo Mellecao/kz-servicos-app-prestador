@@ -1,5 +1,6 @@
 class TripData {
   final String id;
+  final String? candidateId;
   final String clientName;
   final String? clientPhone;
   final String origin;
@@ -25,6 +26,7 @@ class TripData {
 
   const TripData({
     required this.id,
+    this.candidateId,
     required this.clientName,
     this.clientPhone,
     required this.origin,

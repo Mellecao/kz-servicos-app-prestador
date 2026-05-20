@@ -13,6 +13,7 @@ import 'package:kz_servicos_prestador/features/home/presentation/widgets/online_
 import 'package:kz_servicos_prestador/features/home/presentation/widgets/trip_request_card.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
+import 'package:kz_servicos_prestador/core/services/driver_service.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
 import 'package:kz_servicos_prestador/features/trip/data/services/directions_service.dart';
 
@@ -28,10 +29,11 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage>
     with TickerProviderStateMixin {
   GoogleMapController? _mapController;
-  bool _isOnline = true;
+  bool _isOnline = false;
   bool _showRequest = false;
   Timer? _requestTimer;
   final _tripService = TripService();
+  final _driverService = DriverService();
   List<TripData> _requests = [];
   int _currentRequestIndex = 0;
   Set<Polyline> _polylines = {};
@@ -70,21 +72,32 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _load() async {
+    final userId = AuthState.userId;
     final driverProfileId = AuthState.driverProfileId;
     debugPrint('[HomePage] _load — driverProfileId: $driverProfileId');
     if (driverProfileId == null) {
       debugPrint('[HomePage] driverProfileId é null — usuário não é motorista ou sessão não restaurou esse campo');
       return;
     }
-    final trips = await _tripService.getDriverInvitations(driverProfileId);
+
+    final profileFuture = _driverService.getDriverProfile(userId ?? '');
+    final tripsFuture = _tripService.getDriverInvitations(driverProfileId);
+    final profile = await profileFuture;
+    final trips = await tripsFuture;
+
+    if (!mounted) return;
+
+    final isAvailable = profile?.isAvailable ?? false;
+    setState(() => _isOnline = isAvailable);
+
     debugPrint('[HomePage] convites recebidos: ${trips.length}');
-    if (mounted && trips.isNotEmpty) {
+    if (trips.isNotEmpty) {
       setState(() {
         _requests = trips;
         _currentRequestIndex = 0;
-        _showRequest = true;
+        _showRequest = isAvailable;
       });
-      _fetchRouteForCurrentRequest();
+      if (isAvailable) _fetchRouteForCurrentRequest();
     }
   }
 
@@ -159,6 +172,10 @@ class _HomePageState extends State<HomePage>
     });
     _stopPulseAnimation();
     _requestTimer?.cancel();
+    final driverProfileId = AuthState.driverProfileId;
+    if (driverProfileId != null) {
+      _driverService.updateAvailability(driverProfileId, value);
+    }
     if (value && _requests.isNotEmpty) {
       _showNextRequest();
     }
@@ -495,7 +512,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Future<void> _onAccept() async {
+  Future<void> _onAccept(double price) async {
     final driverProfileId = AuthState.driverProfileId;
     if (driverProfileId == null) return;
     final trip = _requests[_currentRequestIndex];
