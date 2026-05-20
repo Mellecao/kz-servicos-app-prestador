@@ -64,14 +64,21 @@ class TripService {
   }
 
   /// Aceita um convite de corrida (atualiza candidato para 'accepted').
-  Future<bool> acceptCandidate(String tripId, String driverProfileId) async {
+  Future<bool> acceptCandidate(
+    String tripId,
+    String driverProfileId, {
+    double? offeredPrice,
+  }) async {
     try {
+      // ignore: use_null_aware_elements
+      final updateMap = {
+        'status': 'accepted',
+        'responded_at': DateTime.now().toIso8601String(),
+        if (offeredPrice != null) 'offered_price': offeredPrice,
+      };
       await _client
           .from('trip_driver_candidates')
-          .update({
-            'status': 'accepted',
-            'responded_at': DateTime.now().toIso8601String(),
-          })
+          .update(updateMap)
           .eq('trip_id', tripId)
           .eq('driver_profile_id', driverProfileId);
       return true;
