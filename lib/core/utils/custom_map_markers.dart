@@ -84,4 +84,32 @@ abstract final class CustomMapMarkers {
     );
     return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
   }
+
+  static Future<BitmapDescriptor> createBlueTriangleIcon() async {
+    const size = 48.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    final fillPaint = Paint()
+      ..color = const Color(0xFF2261FE)
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+
+    final path = Path()
+      ..moveTo(size / 2, 2)
+      ..lineTo(size - 4, size - 4)
+      ..lineTo(4, size - 4)
+      ..close();
+
+    canvas.drawPath(path, fillPaint);
+    canvas.drawPath(path, borderPaint);
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.toInt(), size.toInt());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+  }
 }

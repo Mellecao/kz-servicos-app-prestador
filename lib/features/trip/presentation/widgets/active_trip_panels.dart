@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/widgets/circle_button.dart';
+import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
 
 class ActiveTripPanel extends StatelessWidget {
   final String clientName;
@@ -222,4 +223,112 @@ class TripCompletedPanel extends StatelessWidget {
   }
 }
 
+class ArrivedAtClientPanel extends StatelessWidget {
+  final ActiveTripData trip;
+  final VoidCallback onStart;
 
+  const ArrivedAtClientPanel({
+    super.key,
+    required this.trip,
+    required this.onStart,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 24, 20, bottomPadding + 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 24,
+            offset: const Offset(0, -6),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.location_on_rounded,
+            color: AppColors.highlight,
+            size: 40,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Você chegou ao local de embarque',
+            style: TextStyle(
+              fontFamily: 'OutfitBlack',
+              fontSize: 16,
+              color: AppColors.textPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          _ArrivedDetailRow(icon: Icons.person_outline, label: trip.clientName),
+          const SizedBox(height: 6),
+          _ArrivedDetailRow(icon: Icons.flag_outlined, label: trip.destinationAddress),
+          const SizedBox(height: 6),
+          _ArrivedDetailRow(
+            icon: Icons.people_outline,
+            label: '${trip.passengerCount} passageiro(s)',
+          ),
+          const SizedBox(height: 6),
+          _ArrivedDetailRow(
+            icon: Icons.attach_money,
+            label: 'R\$ ${trip.offeredPrice.toStringAsFixed(2)}',
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: onStart,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2ECC71),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'Iniciar corrida',
+                style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ArrivedDetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _ArrivedDetailRow({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.textSecondary),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textPrimary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
