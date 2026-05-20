@@ -46,6 +46,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   BitmapDescriptor? _blueTriangleIcon;
 
   bool _showArrivedPopup = false;
+  bool _isAdvancing = false;
 
   LatLng get _pickup =>
       LatLng(widget.trip.pickupLat, widget.trip.pickupLng);
@@ -78,6 +79,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     _yellowPinIcon = results[0];
     _yellowCircleIcon = results[1];
     _blueTriangleIcon = results[2];
+    if (!mounted) return;
     _rebuildMarkers();
     _fetchRouteForPhase();
   }
@@ -234,38 +236,44 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   }
 
   Future<void> _advancePhase() async {
-    if (_phase == TripPhase.navigatingToClient) {
-      await _supabase
-          .from('trips')
-          .update({'driver_arrived_at': DateTime.now().toUtc().toIso8601String()})
-          .eq('id', widget.trip.id);
-      setState(() {
-        _phase = TripPhase.arrivedAtClient;
-        _showArrivedPopup = true;
-      });
-      _pulseAnimator?.stop();
-      setState(() => _polylines = {});
-      _mapController?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: _pickup, zoom: 15),
-        ),
-      );
-    } else if (_phase == TripPhase.arrivedAtClient) {
-      await _supabase
-          .from('trips')
-          .update({'started_at': DateTime.now().toUtc().toIso8601String()})
-          .eq('id', widget.trip.id);
-      setState(() {
-        _phase = TripPhase.tripInProgress;
-        _showArrivedPopup = false;
-      });
-      _fetchRouteForPhase();
-    } else if (_phase == TripPhase.tripInProgress) {
-      setState(() => _phase = TripPhase.tripCompleted);
-      _pulseAnimator?.stop();
-      _positionStream?.cancel();
-      _gpsPublishTimer?.cancel();
-      setState(() => _polylines = {});
+    if (_isAdvancing) return;
+    _isAdvancing = true;
+    try {
+      if (_phase == TripPhase.navigatingToClient) {
+        await _supabase
+            .from('trips')
+            .update({'driver_arrived_at': DateTime.now().toUtc().toIso8601String()})
+            .eq('id', widget.trip.id);
+        setState(() {
+          _phase = TripPhase.arrivedAtClient;
+          _showArrivedPopup = true;
+        });
+        _pulseAnimator?.stop();
+        setState(() => _polylines = {});
+        _mapController?.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(target: _pickup, zoom: 15),
+          ),
+        );
+      } else if (_phase == TripPhase.arrivedAtClient) {
+        await _supabase
+            .from('trips')
+            .update({'started_at': DateTime.now().toUtc().toIso8601String()})
+            .eq('id', widget.trip.id);
+        setState(() {
+          _phase = TripPhase.tripInProgress;
+          _showArrivedPopup = false;
+        });
+        _fetchRouteForPhase();
+      } else if (_phase == TripPhase.tripInProgress) {
+        setState(() => _phase = TripPhase.tripCompleted);
+        _pulseAnimator?.stop();
+        _positionStream?.cancel();
+        _gpsPublishTimer?.cancel();
+        setState(() => _polylines = {});
+      }
+    } finally {
+      _isAdvancing = false;
     }
   }
 
