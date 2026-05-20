@@ -51,13 +51,13 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
     bool ok;
     if (_trip.status == 'searching_drivers') {
       ok = await _tripService.acceptAvailableTrip(
-        _trip.id,
+        _trip.tripId,
         // providerProfileId used as driverProfileId in the DB update
-        _trip.id, // placeholder — real call uses AuthState
+        _trip.tripId, // placeholder — real call uses AuthState
       );
     } else {
       ok = await _tripService.confirmScheduledTrip(
-        _trip.id,
+        _trip.tripId,
         _observationController.text.trim().isEmpty
             ? null
             : _observationController.text.trim(),
@@ -90,7 +90,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
 
     setState(() => _isLoading = true);
     final ok = await _tripService.rejectTrip(
-      _trip.id,
+      _trip.tripId,
       _observationController.text.trim(),
     );
 
@@ -389,7 +389,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
 
   Future<void> _startTrip() async {
     setState(() => _isLoading = true);
-    final ok = await _tripService.startTrip(_trip.id);
+    final ok = await _tripService.startTrip(_trip.tripId);
     if (!mounted) return;
     setState(() => _isLoading = false);
     ScaffoldMessenger.of(context).showSnackBar(

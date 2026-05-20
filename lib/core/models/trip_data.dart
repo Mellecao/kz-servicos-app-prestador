@@ -1,6 +1,6 @@
 class TripData {
-  final String id;
-  final String? candidateId;
+  final String tripId;
+  final String candidateId;
   final String clientName;
   final String? clientPhone;
   final String origin;
@@ -25,8 +25,8 @@ class TripData {
   final List<TripLuggage> luggage;
 
   const TripData({
-    required this.id,
-    this.candidateId,
+    required this.tripId,
+    required this.candidateId,
     required this.clientName,
     this.clientPhone,
     required this.origin,
@@ -110,7 +110,8 @@ class TripData {
     }
 
     return TripData(
-      id: map['id'] as String,
+      tripId: map['id'] as String,
+      candidateId: map['candidate_id'] as String? ?? '',
       clientName: clientMap['full_name'] as String? ?? 'Cliente',
       clientPhone: clientMap['phone'] as String?,
       origin: pickup['formatted_address'] as String? ?? '',

@@ -516,7 +516,7 @@ class _HomePageState extends State<HomePage>
     final driverProfileId = AuthState.driverProfileId;
     if (driverProfileId == null) return;
     final trip = _requests[_currentRequestIndex];
-    final ok = await _tripService.acceptCandidate(trip.id, driverProfileId);
+    final ok = await _tripService.acceptCandidate(trip.tripId, driverProfileId);
     if (!mounted) return;
     if (!ok) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -535,7 +535,7 @@ class _HomePageState extends State<HomePage>
     if (driverProfileId == null) return;
     final trip = _requests[_currentRequestIndex];
     final ok = await _tripService.rejectCandidate(
-      trip.id,
+      trip.tripId,
       driverProfileId,
       observation: observation.isEmpty ? null : observation,
     );

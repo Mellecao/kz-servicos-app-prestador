@@ -4,7 +4,7 @@ import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/features/home/presentation/widgets/trip_request_card.dart';
 
 final _mockTrip = TripData(
-  id: 'trip-1',
+  tripId: 'trip-1',
   candidateId: 'cand-1',
   clientName: 'Ana',
   origin: 'Rua A',

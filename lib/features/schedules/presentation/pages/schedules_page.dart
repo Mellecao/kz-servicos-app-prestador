@@ -46,7 +46,7 @@ class _SchedulesPageState extends State<SchedulesPage> {
   }
 
   Future<void> _startTrip(TripData trip) async {
-    final ok = await _tripService.startTrip(trip.id);
+    final ok = await _tripService.startTrip(trip.tripId);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
