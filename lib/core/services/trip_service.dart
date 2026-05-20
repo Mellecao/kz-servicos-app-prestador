@@ -27,13 +27,17 @@ class TripService {
     try {
       final res = await _client
           .from('trip_driver_candidates')
-          .select('trip:trips!trip_id($_tripSelect)')
+          .select('id, trip:trips!trip_id($_tripSelect)')
           .eq('driver_profile_id', driverProfileId)
           .eq('status', 'pending');
       return (res as List)
-          .map((c) => (c as Map)['trip'] as Map<String, dynamic>?)
-          .where((trip) => trip != null)
-          .map((trip) => TripData.fromMap(trip!))
+          .map((c) {
+            final cMap = c as Map<String, dynamic>;
+            final trip = cMap['trip'] as Map<String, dynamic>?;
+            if (trip == null) return null;
+            return TripData.fromMap({...trip, 'candidate_id': cMap['id']});
+          })
+          .whereType<TripData>()
           .toList();
     } catch (e) {
       debugPrint('[TripService] getDriverInvitations erro: $e');
