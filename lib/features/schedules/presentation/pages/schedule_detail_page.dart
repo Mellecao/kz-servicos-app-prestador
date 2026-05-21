@@ -5,6 +5,7 @@ import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/constants/map_styles.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
+import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
 
 class ScheduleDetailPage extends StatefulWidget {
   final TripData trip;
@@ -392,13 +393,30 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
     final ok = await _tripService.startTrip(_trip.tripId);
     if (!mounted) return;
     setState(() => _isLoading = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(ok ? 'Viagem iniciada!' : 'Erro ao iniciar viagem'),
-        backgroundColor: ok ? const Color(0xFF2ECC71) : Colors.red.shade400,
-      ),
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Erro ao iniciar viagem'),
+          backgroundColor: Colors.red.shade400,
+        ),
+      );
+      return;
+    }
+    final activeTripData = ActiveTripData(
+      id: _trip.tripId,
+      candidateId: '',
+      clientName: _trip.clientName,
+      pickupAddress: _trip.origin,
+      destinationAddress: _trip.destination,
+      pickupLat: _trip.originLat,
+      pickupLng: _trip.originLng,
+      destinationLat: _trip.destinationLat,
+      destinationLng: _trip.destinationLng,
+      passengerCount: _trip.passengerCount,
+      offeredPrice: _trip.price,
     );
-    if (ok) context.pop();
+    if (!mounted) return;
+    context.push('/active-trip', extra: activeTripData);
   }
 
   Widget _buildStartBar() {

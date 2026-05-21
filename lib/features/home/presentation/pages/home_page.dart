@@ -15,8 +15,6 @@ import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/driver_service.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
-import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
 import 'package:kz_servicos_prestador/features/trip/data/services/directions_service.dart';
 
 class HomePage extends StatefulWidget {
@@ -531,28 +529,13 @@ class _HomePageState extends State<HomePage>
       return;
     }
     _stopPulseAnimation();
-
-    // Build ActiveTripData from Supabase and navigate to active trip page
-    try {
-      final supabase = Supabase.instance.client;
-      final tripData = await supabase.from('trips').select('''
-        *,
-        pickup_address:addresses!pickup_address_id(*),
-        dropoff_address:addresses!dropoff_address_id(*),
-        users!client_id(full_name)
-      ''').eq('id', request.tripId).single();
-
-      final activeTripData = ActiveTripData.fromSupabase(
-        tripData,
-        request.candidateId,
-        price,
-      );
-
-      if (!mounted) return;
-      context.push('/active-trip', extra: activeTripData);
-    } catch (_) {
-      _advanceToNextRequest();
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Solicitação aceita! Acompanhe em Agendamentos.'),
+        backgroundColor: Color(0xFF2ECC71),
+      ),
+    );
+    _advanceToNextRequest();
   }
 
   Future<void> _onReject() async {
