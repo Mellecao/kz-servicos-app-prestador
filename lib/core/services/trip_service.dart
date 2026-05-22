@@ -45,18 +45,26 @@ class TripService {
     }
   }
 
-  /// Candidaturas aceitas pelo motorista ainda aguardando aprovação — tela agendamentos.
+  /// Candidaturas aceitas pelo motorista ainda aguardando aprovação — tela agendamentos e carousel.
   Future<List<TripData>> getDriverAcceptedCandidacies(String driverProfileId) async {
     try {
       final res = await _client
           .from('trip_driver_candidates')
-          .select('trip:trips!trip_id($_tripSelect)')
+          .select('status, trip:trips!trip_id($_tripSelect)')
           .eq('driver_profile_id', driverProfileId)
           .eq('status', 'accepted');
       return (res as List)
-          .map((c) => (c as Map)['trip'] as Map<String, dynamic>?)
-          .where((trip) => trip != null)
-          .map((trip) => TripData.fromMap(trip!))
+          .map((c) {
+            final cMap = c as Map<String, dynamic>;
+            final trip = cMap['trip'] as Map<String, dynamic>?;
+            if (trip == null) return null;
+            return TripData.fromMap({
+              ...trip,
+              'candidate_id': cMap['id'] ?? '',
+              'candidate_status': cMap['status'],
+            });
+          })
+          .whereType<TripData>()
           .where((trip) =>
               trip.status == 'searching_drivers' ||
               trip.status == 'awaiting_client_confirmation')
