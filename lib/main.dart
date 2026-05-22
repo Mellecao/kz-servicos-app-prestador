@@ -14,8 +14,8 @@ void main() async {
   // Inicializar Supabase (temporariamente comentado para evitar erro de API key)
   try {
     await Supabase.initialize(
-      url: 'https://wmlsiwjrgjygqdjtsayt.supabase.co',
-      anonKey: 'sb_publishable_Uczyit6MEzgq3grhCVqmaA_vT0m5EVS',
+      url: 'https://ddbspibrzakmwljknvhw.supabase.co',
+      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkYnNwaWJyemFrbXdsamtudmh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzODAwNzYsImV4cCI6MjA5NDk1NjA3Nn0.LVt5jX9EwvBMHB6u7ipG_zoYhdgFufoHvf--nofI7dM',
       debug: true,
     );
   } catch (e) {

@@ -41,47 +41,42 @@ class _ScheduledTripsCarouselState extends State<ScheduledTripsCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: screenHeight * 0.45),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 18,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: PageView.builder(
-                controller: _pageController,
-                physics: const BouncingScrollPhysics(),
-                itemCount: widget.trips.length,
-                itemBuilder: (_, i) => GestureDetector(
-                  onTap: () => widget.onTap(widget.trips[i]),
-                  child: _TripCard(trip: widget.trips[i]),
-                ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 140,
+            child: PageView.builder(
+              controller: _pageController,
+              physics: const BouncingScrollPhysics(),
+              itemCount: widget.trips.length,
+              itemBuilder: (_, i) => GestureDetector(
+                onTap: () => widget.onTap(widget.trips[i]),
+                child: _TripCard(trip: widget.trips[i]),
               ),
             ),
-            if (widget.trips.length > 1)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _DotsIndicator(
-                  count: widget.trips.length,
-                  current: _currentPage,
-                ),
+          ),
+          if (widget.trips.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _DotsIndicator(
+                count: widget.trips.length,
+                current: _currentPage,
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

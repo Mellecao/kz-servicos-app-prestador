@@ -4,8 +4,16 @@ import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 class CircleButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
+  final Color? backgroundColor;
+  final Color? iconColor;
 
-  const CircleButton({super.key, required this.icon, required this.onTap});
+  const CircleButton({
+    super.key,
+    required this.icon,
+    required this.onTap,
+    this.backgroundColor,
+    this.iconColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +23,7 @@ class CircleButton extends StatelessWidget {
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: backgroundColor ?? Colors.white,
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
@@ -25,7 +33,7 @@ class CircleButton extends StatelessWidget {
             ),
           ],
         ),
-        child: Icon(icon, color: AppColors.textPrimary, size: 20),
+        child: Icon(icon, color: iconColor ?? AppColors.textPrimary, size: 20),
       ),
     );
   }

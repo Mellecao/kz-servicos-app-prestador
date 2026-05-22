@@ -19,6 +19,7 @@ class TripData {
   final String? driverObservations;
   final double? estimatedPrice;
   final double? finalPrice;
+  final double? offeredPrice;
   final String? paymentMethod;
   final String status;
   final DateTime? finishedAt;
@@ -47,6 +48,7 @@ class TripData {
     this.driverObservations,
     this.estimatedPrice,
     this.finalPrice,
+    this.offeredPrice,
     this.paymentMethod,
     required this.status,
     this.finishedAt,
@@ -55,7 +57,7 @@ class TripData {
     this.luggage = const [],
   });
 
-  double get price => finalPrice ?? estimatedPrice ?? 0;
+  double get price => finalPrice ?? estimatedPrice ?? offeredPrice ?? 0;
 
   bool get hasChildren => childrenCount > 0;
   bool get hasLuggage => luggageCount > 0;
@@ -140,6 +142,7 @@ class TripData {
       driverObservations: map['driver_observations'] as String?,
       estimatedPrice: (map['estimated_price'] as num?)?.toDouble(),
       finalPrice: (map['final_price'] as num?)?.toDouble(),
+      offeredPrice: (map['offered_price'] as num?)?.toDouble(),
       paymentMethod: map['payment_method'] as String?,
       status: map['status'] as String? ?? 'open',
       finishedAt: map['finished_at'] != null

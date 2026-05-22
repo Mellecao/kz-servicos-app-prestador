@@ -766,9 +766,9 @@ class _HomePageState extends State<HomePage>
           if ((AuthState.scheduledTrips?.trips.isNotEmpty ?? false) &&
               !(_showRequest && _requests.isNotEmpty))
             Positioned(
-              bottom: bottomPadding + 72,
-              left: 0,
-              right: 0,
+              bottom: bottomPadding + 104,
+              left: 16,
+              right: 16,
               child: ScheduledTripsCarousel(
                 trips: AuthState.scheduledTrips!.trips,
                 onTap: (trip) => context.push('/schedule-detail', extra: trip),

@@ -50,7 +50,7 @@ class TripService {
     try {
       final res = await _client
           .from('trip_driver_candidates')
-          .select('id, status, trip:trips!trip_id($_tripSelect)')
+          .select('id, status, offered_price, trip:trips!trip_id($_tripSelect)')
           .eq('driver_profile_id', driverProfileId)
           .eq('status', 'accepted');
       return (res as List)
@@ -62,6 +62,7 @@ class TripService {
               ...trip,
               'candidate_id': cMap['id'] ?? '',
               'candidate_status': cMap['status'],
+              'offered_price': cMap['offered_price'],
             });
           })
           .whereType<TripData>()
@@ -82,12 +83,11 @@ class TripService {
     double? offeredPrice,
   }) async {
     try {
-      // ignore: use_null_aware_elements
-      final updateMap = {
+      final updateMap = <String, dynamic>{
         'status': 'accepted',
         'responded_at': DateTime.now().toIso8601String(),
-        if (offeredPrice != null) 'offered_price': offeredPrice,
       };
+      if (offeredPrice != null) updateMap['offered_price'] = offeredPrice;
       await _client
           .from('trip_driver_candidates')
           .update(updateMap)

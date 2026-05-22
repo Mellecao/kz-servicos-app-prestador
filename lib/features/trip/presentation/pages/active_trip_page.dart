@@ -116,6 +116,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
       _currentHeading = pos.heading.isNaN ? 0.0 : pos.heading;
       _rebuildMarkers();
       _updateCamera();
+      _fetchRouteForPhase();
     } catch (_) {}
 
     _positionStream = Geolocator.getPositionStream(
@@ -192,7 +193,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
       CameraUpdate.newCameraPosition(CameraPosition(
         target: _currentLocation,
         zoom: 17.5,
-        tilt: 65,
+        tilt: 45,
         bearing: _currentHeading,
       )),
     );
@@ -465,7 +466,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
             initialCameraPosition: CameraPosition(
               target: _pickup,
               zoom: 17.5,
-              tilt: 65,
+              tilt: 45,
             ),
             style: MapStyles.standard,
             onMapCreated: (c) {
@@ -477,6 +478,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
             myLocationEnabled: false,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
+            buildingsEnabled: false,
             onCameraMoveStarted: () {
               if (!_isCameraAnimating && _phase.isGpsMode) {
                 setState(() => _cameraFollowing = false);
@@ -542,6 +544,8 @@ class _ActiveTripPageState extends State<ActiveTripPage>
               bottom: 220,
               child: CircleButton(
                 icon: Icons.open_in_new_rounded,
+                backgroundColor: AppColors.highlight,
+                iconColor: Colors.black,
                 onTap: () => showExternalNavSheet(context, _navTarget),
               ),
             ),

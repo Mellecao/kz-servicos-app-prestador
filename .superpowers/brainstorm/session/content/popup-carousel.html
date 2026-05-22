@@ -1,0 +1,167 @@
+<h2>Popup de corridas agendadas — qual tamanho/densidade?</h2>
+<p class="subtitle">O popup fica fixo acima do menu inferior. Qual versão te parece melhor?</p>
+
+<div class="cards">
+
+  <!-- Option A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f0f0f0; padding:12px; display:flex; flex-direction:column; gap:8px;">
+      <!-- Phone mockup -->
+      <div style="background:#1a1a2e; border-radius:16px; overflow:hidden; position:relative; height:340px; display:flex; flex-direction:column; justify-content:flex-end; font-family:sans-serif;">
+        <!-- Map area -->
+        <div style="flex:1; background:linear-gradient(160deg,#2d4a2d 0%,#3a6b3a 40%,#4a7a4a 100%); position:relative; overflow:hidden;">
+          <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 30px,rgba(255,255,255,0.03) 30px,rgba(255,255,255,0.03) 31px),repeating-linear-gradient(90deg,transparent,transparent 40px,rgba(255,255,255,0.03) 40px,rgba(255,255,255,0.03) 41px);"></div>
+          <!-- Roads -->
+          <div style="position:absolute;top:30%;left:0;right:0;height:5px;background:rgba(255,255,255,0.15);transform:rotate(-5deg);"></div>
+          <div style="position:absolute;top:55%;left:10%;right:0;height:4px;background:rgba(255,255,255,0.1);transform:rotate(3deg);"></div>
+        </div>
+        <!-- Popup card - COMPACT -->
+        <div style="background:white; border-radius:14px 14px 0 0; padding:10px 12px; margin:0 8px 8px; border-radius:12px; box-shadow:0 -4px 16px rgba(0,0,0,0.15);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-weight:700; font-size:12px; color:#1a1a1a;">João Silva</span>
+            <span style="background:#FFF3E0; color:#E65100; font-size:9px; padding:2px 7px; border-radius:8px; font-weight:600;">Aguardando KZ</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#888; font-size:10px;">25/05 · 14:30 · R$ 85,00</span>
+            <span style="color:#ccc; font-size:10px;">→</span>
+          </div>
+          <!-- Dots -->
+          <div style="display:flex; justify-content:center; gap:4px; margin-top:6px;">
+            <div style="width:6px;height:6px;background:#F4C72F;border-radius:50%;"></div>
+            <div style="width:6px;height:6px;background:#ddd;border-radius:50%;"></div>
+            <div style="width:6px;height:6px;background:#ddd;border-radius:50%;"></div>
+          </div>
+        </div>
+        <!-- Bottom nav -->
+        <div style="background:white; padding:8px 16px 10px; display:flex; justify-content:space-around; border-top:1px solid #eee;">
+          <div style="text-align:center;"><div style="font-size:18px;">🏠</div><div style="font-size:8px;color:#F4C72F;">Home</div></div>
+          <div style="text-align:center;"><div style="font-size:18px;">📅</div><div style="font-size:8px;color:#aaa;">Agenda</div></div>
+          <div style="text-align:center;"><div style="font-size:18px;">💰</div><div style="font-size:8px;color:#aaa;">Ganhos</div></div>
+          <div style="text-align:center;"><div style="font-size:18px;">👤</div><div style="font-size:8px;color:#aaa;">Perfil</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Compacto</h3>
+      <p>Card mínimo: nome, status, data/hora/valor numa linha, dots de paginação. Mais espaço para o mapa.</p>
+    </div>
+  </div>
+
+  <!-- Option B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f0f0f0; padding:12px; display:flex; flex-direction:column; gap:8px;">
+      <div style="background:#1a1a2e; border-radius:16px; overflow:hidden; position:relative; height:340px; display:flex; flex-direction:column; justify-content:flex-end; font-family:sans-serif;">
+        <div style="flex:1; background:linear-gradient(160deg,#2d4a2d 0%,#3a6b3a 40%,#4a7a4a 100%); position:relative; overflow:hidden;">
+          <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 30px,rgba(255,255,255,0.03) 30px,rgba(255,255,255,0.03) 31px),repeating-linear-gradient(90deg,transparent,transparent 40px,rgba(255,255,255,0.03) 40px,rgba(255,255,255,0.03) 41px);"></div>
+          <div style="position:absolute;top:30%;left:0;right:0;height:5px;background:rgba(255,255,255,0.15);transform:rotate(-5deg);"></div>
+          <div style="position:absolute;top:55%;left:10%;right:0;height:4px;background:rgba(255,255,255,0.1);transform:rotate(3deg);"></div>
+        </div>
+        <!-- Popup card - MEDIUM with route -->
+        <div style="background:white; padding:11px 13px; margin:0 8px 8px; border-radius:12px; box-shadow:0 -4px 16px rgba(0,0,0,0.15);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:7px;">
+            <div>
+              <div style="font-weight:700; font-size:12px; color:#1a1a1a;">João Silva</div>
+              <div style="color:#888; font-size:10px; margin-top:1px;">25/05 · 14:30</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="background:#FFF3E0; color:#E65100; font-size:9px; padding:2px 7px; border-radius:8px; font-weight:600; margin-bottom:2px;">Aguardando KZ</div>
+              <div style="font-weight:700; font-size:12px; color:#27AE60;">R$ 85,00</div>
+            </div>
+          </div>
+          <!-- Route line -->
+          <div style="display:flex; align-items:flex-start; gap:6px;">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:2px; padding-top:2px;">
+              <div style="width:7px;height:7px;border:2px solid #27AE60;border-radius:50%;"></div>
+              <div style="width:1.5px;height:12px;background:#ddd;"></div>
+              <div style="width:7px;height:7px;border:2px solid #E74C3C;border-radius:50%;"></div>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:10px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Av. Paulista, 1000, SP</div>
+              <div style="height:10px;"></div>
+              <div style="font-size:10px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Aeroporto de Congonhas</div>
+            </div>
+          </div>
+          <!-- Dots -->
+          <div style="display:flex; justify-content:center; gap:4px; margin-top:7px;">
+            <div style="width:6px;height:6px;background:#F4C72F;border-radius:50%;"></div>
+            <div style="width:6px;height:6px;background:#ddd;border-radius:50%;"></div>
+            <div style="width:6px;height:6px;background:#ddd;border-radius:50%;"></div>
+          </div>
+        </div>
+        <!-- Bottom nav -->
+        <div style="background:white; padding:8px 16px 10px; display:flex; justify-content:space-around; border-top:1px solid #eee;">
+          <div style="text-align:center;"><div style="font-size:18px;">🏠</div><div style="font-size:8px;color:#F4C72F;">Home</div></div>
+          <div style="text-align:center;"><div style="font-size:18px;">📅</div><div style="font-size:8px;color:#aaa;">Agenda</div></div>
+          <div style="text-align:center;"><div style="font-size:18px;">💰</div><div style="font-size:8px;color:#aaa;">Ganhos</div></div>
+          <div style="text-align:center;"><div style="font-size:18px;">👤</div><div style="font-size:8px;color:#aaa;">Perfil</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Médio com rota</h3>
+      <p>Mostra origem/destino além de nome, status, data e valor. Referência visual completa sem precisar abrir detalhes.</p>
+    </div>
+  </div>
+
+  <!-- Option C -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f0f0f0; padding:12px; display:flex; flex-direction:column; gap:8px;">
+      <div style="background:#1a1a2e; border-radius:16px; overflow:hidden; position:relative; height:340px; display:flex; flex-direction:column; justify-content:flex-end; font-family:sans-serif;">
+        <div style="flex:1; background:linear-gradient(160deg,#2d4a2d 0%,#3a6b3a 40%,#4a7a4a 100%); position:relative; overflow:hidden;">
+          <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 30px,rgba(255,255,255,0.03) 30px,rgba(255,255,255,0.03) 31px),repeating-linear-gradient(90deg,transparent,transparent 40px,rgba(255,255,255,0.03) 40px,rgba(255,255,255,0.03) 41px);"></div>
+          <div style="position:absolute;top:30%;left:0;right:0;height:5px;background:rgba(255,255,255,0.15);transform:rotate(-5deg);"></div>
+          <div style="position:absolute;top:55%;left:10%;right:0;height:4px;background:rgba(255,255,255,0.1);transform:rotate(3deg);"></div>
+        </div>
+        <!-- Popup card - FULL with partial overlap into map -->
+        <div style="background:white; padding:12px 13px 10px; margin:0 8px 8px; border-radius:12px; box-shadow:0 -6px 20px rgba(0,0,0,0.18);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:7px;">
+            <div>
+              <div style="font-weight:700; font-size:12px; color:#1a1a1a;">João Silva</div>
+              <div style="color:#888; font-size:10px; margin-top:1px;">25/05 · 14:30 · 2 passageiros</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="background:#FFF3E0; color:#E65100; font-size:9px; padding:2px 7px; border-radius:8px; font-weight:600; margin-bottom:2px;">Aguardando KZ</div>
+              <div style="font-weight:700; font-size:12px; color:#27AE60;">R$ 85,00</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:7px;">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:2px; padding-top:2px;">
+              <div style="width:7px;height:7px;border:2px solid #27AE60;border-radius:50%;"></div>
+              <div style="width:1.5px;height:12px;background:#ddd;"></div>
+              <div style="width:7px;height:7px;border:2px solid #E74C3C;border-radius:50%;"></div>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:10px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Av. Paulista, 1000</div>
+              <div style="height:10px;"></div>
+              <div style="font-size:10px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Aeroporto de Congonhas</div>
+            </div>
+          </div>
+          <!-- Payment method -->
+          <div style="display:flex; align-items:center; gap:5px; padding-top:6px; border-top:1px solid #f0f0f0; margin-bottom:5px;">
+            <span style="font-size:9px;color:#aaa;">💳 PIX</span>
+            <span style="font-size:9px;color:#aaa;">·</span>
+            <span style="font-size:9px;color:#aaa;">👜 1 mala</span>
+          </div>
+          <!-- Dots -->
+          <div style="display:flex; justify-content:center; gap:4px;">
+            <div style="width:6px;height:6px;background:#F4C72F;border-radius:50%;"></div>
+            <div style="width:6px;height:6px;background:#ddd;border-radius:50%;"></div>
+            <div style="width:6px;height:6px;background:#ddd;border-radius:50%;"></div>
+          </div>
+        </div>
+        <!-- Bottom nav -->
+        <div style="background:white; padding:8px 16px 10px; display:flex; justify-content:space-around; border-top:1px solid #eee;">
+          <div style="text-align:center;"><div style="font-size:18px;">🏠</div><div style="font-size:8px;color:#F4C72F;">Home</div></div>
+          <div style="text-align:center;"><div style="font-size:18px;">📅</div><div style="font-size:8px;color:#aaa;">Agenda</div></div>
+          <div style="text-align:center;"><div style="font-size:18px;">💰</div><div style="font-size:8px;color:#aaa;">Ganhos</div></div>
+          <div style="text-align:center;"><div style="font-size:18px;">👤</div><div style="font-size:8px;color:#aaa;">Perfil</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Completo</h3>
+      <p>Tudo: rota, passageiros, método de pagamento, bagagem + status + valor. Mais info, menos necessidade de clicar.</p>
+    </div>
+  </div>
+
+</div>
