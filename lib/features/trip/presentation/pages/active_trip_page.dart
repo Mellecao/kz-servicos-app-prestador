@@ -17,6 +17,7 @@ import 'package:kz_servicos_prestador/features/trip/domain/trip_phase.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/helpers/external_nav_helper.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/widgets/active_trip_panels.dart';
 import 'package:kz_servicos_prestador/core/services/navigation_audio_service.dart';
+import 'package:kz_servicos_prestador/core/services/trip_audio_service.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/widgets/navigation_instruction_banner.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/widgets/phase_badge.dart';
 
@@ -57,6 +58,9 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   bool _paymentConfirmed = false;
   bool _isMarkingPaid = false;
   bool _isFinishing = false;
+  bool _cameraFollowing = true;
+  bool _isCameraAnimating = false;
+  final TripAudioService _tripAudio = TripAudioService();
   String _feedbackComment = '';
 
   LatLng get _pickup =>
@@ -79,6 +83,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     _positionStream?.cancel();
     _gpsPublishTimer?.cancel();
     _pulseAnimator?.dispose();
+    unawaited(_tripAudio.dispose());
     super.dispose();
   }
 
@@ -181,7 +186,8 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   }
 
   void _updateCamera() {
-    if (_mapController == null || !_phase.isGpsMode) return;
+    if (_mapController == null || !_phase.isGpsMode || !_cameraFollowing) return;
+    _isCameraAnimating = true;
     _mapController!.animateCamera(
       CameraUpdate.newCameraPosition(CameraPosition(
         target: _currentLocation,
@@ -190,6 +196,11 @@ class _ActiveTripPageState extends State<ActiveTripPage>
         bearing: _currentHeading,
       )),
     );
+  }
+
+  void _recenterCamera() {
+    setState(() => _cameraFollowing = true);
+    _updateCamera();
   }
 
   void _rebuildMarkers() {
@@ -306,6 +317,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
         });
         _pulseAnimator?.stop();
         setState(() => _polylines = {});
+        _isCameraAnimating = true;
         _mapController?.animateCamera(
           CameraUpdate.newCameraPosition(
             CameraPosition(target: _pickup, zoom: 15),
@@ -367,6 +379,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
           .from('trips')
           .update({'is_driver_paied': true})
           .eq('id', widget.trip.id);
+      unawaited(_tripAudio.playPayment());
       if (mounted) setState(() => _paymentConfirmed = true);
     } catch (e) {
       debugPrint('[KZ-P] _onPaymentConfirmed erro: $e');
@@ -464,6 +477,14 @@ class _ActiveTripPageState extends State<ActiveTripPage>
             myLocationEnabled: false,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
+            onCameraMoveStarted: () {
+              if (!_isCameraAnimating && _phase.isGpsMode) {
+                setState(() => _cameraFollowing = false);
+              }
+            },
+            onCameraIdle: () {
+              _isCameraAnimating = false;
+            },
           ),
           Positioned(
             top: topPadding + 8,
@@ -490,6 +511,29 @@ class _ActiveTripPageState extends State<ActiveTripPage>
               child: NavigationInstructionBanner(
                 step: _routeSteps[_currentStepIndex],
                 phaseColor: _phase.color,
+              ),
+            ),
+          if (_phase.isGpsMode)
+            Positioned(
+              right: 16,
+              bottom: 332,
+              child: CircleButton(
+                icon: _audioService.isMuted
+                    ? Icons.volume_off
+                    : Icons.volume_up,
+                onTap: () {
+                  _audioService.toggleMute();
+                  setState(() {});
+                },
+              ),
+            ),
+          if (_phase.isGpsMode && !_cameraFollowing)
+            Positioned(
+              right: 16,
+              bottom: 276,
+              child: CircleButton(
+                icon: Icons.my_location,
+                onTap: _recenterCamera,
               ),
             ),
           if (_phase.isActive)
