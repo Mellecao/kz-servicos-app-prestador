@@ -105,7 +105,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
       );
       if (!mounted) return;
       _currentLocation = LatLng(pos.latitude, pos.longitude);
-      _currentHeading = pos.heading;
+      _currentHeading = pos.heading.isNaN ? 0.0 : pos.heading;
       _rebuildMarkers();
       _updateCamera();
     } catch (_) {}
@@ -156,7 +156,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   }
 
   void _updateCurrentStep() {
-    if (_routeSteps.isEmpty) return;
+    if (!_phase.isGpsMode || _routeSteps.isEmpty) return;
     for (int i = _currentStepIndex; i < _routeSteps.length; i++) {
       final end = _routeSteps[i].endLocation;
       final dist = Geolocator.distanceBetween(
