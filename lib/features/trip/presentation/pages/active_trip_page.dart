@@ -16,6 +16,7 @@ import 'package:kz_servicos_prestador/features/trip/data/services/directions_ser
 import 'package:kz_servicos_prestador/features/trip/domain/trip_phase.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/helpers/external_nav_helper.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/widgets/active_trip_panels.dart';
+import 'package:kz_servicos_prestador/features/trip/presentation/widgets/navigation_instruction_banner.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/widgets/phase_badge.dart';
 
 class ActiveTripPage extends StatefulWidget {
@@ -147,10 +148,33 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     if (!mounted) return;
     setState(() {
       _currentLocation = LatLng(position.latitude, position.longitude);
-      _currentHeading = position.heading;
+      _currentHeading = position.heading.isNaN ? 0.0 : position.heading;
     });
     _rebuildMarkers();
     _updateCamera();
+    _updateCurrentStep();
+  }
+
+  void _updateCurrentStep() {
+    if (_routeSteps.isEmpty) return;
+    for (int i = _currentStepIndex; i < _routeSteps.length; i++) {
+      final end = _routeSteps[i].endLocation;
+      final dist = Geolocator.distanceBetween(
+        _currentLocation.latitude, _currentLocation.longitude,
+        end.latitude, end.longitude,
+      );
+      if (dist > 25) {
+        if (_currentStepIndex != i) {
+          setState(() => _currentStepIndex = i);
+          _speakInstruction(_routeSteps[i].instruction);
+        }
+        return;
+      }
+    }
+  }
+
+  void _speakInstruction(String instruction) {
+    // implemented in Task 15
   }
 
   void _updateCamera() {
@@ -449,6 +473,19 @@ class _ActiveTripPageState extends State<ActiveTripPage>
             right: 64,
             child: PhaseBadge(phase: _phase),
           ),
+          // Banner de instrução de navegação
+          if (_phase.isGpsMode &&
+              _routeSteps.isNotEmpty &&
+              _currentStepIndex < _routeSteps.length)
+            Positioned(
+              top: topPadding + 58,
+              left: 0,
+              right: 0,
+              child: NavigationInstructionBanner(
+                step: _routeSteps[_currentStepIndex],
+                phaseColor: _phase.color,
+              ),
+            ),
           if (_phase.isActive)
             Positioned(
               right: 16,
