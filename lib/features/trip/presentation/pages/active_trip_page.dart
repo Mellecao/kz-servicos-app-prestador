@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/constants/map_styles.dart';
 import 'package:kz_servicos_prestador/core/utils/custom_map_markers.dart';
@@ -47,6 +48,9 @@ class _ActiveTripPageState extends State<ActiveTripPage>
 
   bool _showArrivedPopup = false;
   bool _isAdvancing = false;
+  bool _paymentConfirmed = false;
+  bool _isMarkingPaid = false;
+  String _feedbackComment = '';
 
   LatLng get _pickup =>
       LatLng(widget.trip.pickupLat, widget.trip.pickupLng);
@@ -315,6 +319,57 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     }
   }
 
+  Future<void> _onPaymentConfirmed() async {
+    if (_isMarkingPaid) return;
+    _isMarkingPaid = true;
+    try {
+      await _supabase
+          .from('trips')
+          .update({'is_driver_paied': true})
+          .eq('id', widget.trip.id);
+      if (mounted) setState(() => _paymentConfirmed = true);
+    } catch (e) {
+      debugPrint('[KZ-P] _onPaymentConfirmed erro: $e');
+    } finally {
+      _isMarkingPaid = false;
+    }
+  }
+
+  void _onReportProblem() {
+    final trip = widget.trip;
+    final scheduledAt = trip.scheduledAt;
+    final dateStr = scheduledAt != null
+        ? '${scheduledAt.day.toString().padLeft(2, '0')}/${scheduledAt.month.toString().padLeft(2, '0')}'
+        : '';
+    final timeStr = scheduledAt != null
+        ? '${scheduledAt.hour.toString().padLeft(2, '0')}:${scheduledAt.minute.toString().padLeft(2, '0')}'
+        : '';
+    final msg = Uri.encodeComponent(
+      'Olá, tive um problema com o passageiro ${trip.clientName} na corrida de $dateStr às $timeStr, de ${trip.pickupAddress} para ${trip.destinationAddress}.',
+    );
+    launchUrl(
+      Uri.parse('https://wa.me/5511985889577?text=$msg'),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
+  Future<void> _onFinish() async {
+    if (_clientRating > 0 && widget.trip.clientId != null) {
+      try {
+        await _supabase.from('ratings').insert({
+          'trip_id': widget.trip.id,
+          'rater_id': _supabase.auth.currentUser!.id,
+          'rated_id': widget.trip.clientId,
+          'rating': _clientRating.toDouble(),
+          if (_feedbackComment.isNotEmpty) 'comment': _feedbackComment,
+        });
+      } catch (e) {
+        debugPrint('[KZ-P] rating insert erro: $e');
+      }
+    }
+    if (mounted) context.go('/home');
+  }
+
   LatLng get _navTarget =>
       (_phase == TripPhase.navigatingToClient ||
               _phase == TripPhase.arrivedAtClient)
@@ -383,15 +438,22 @@ class _ActiveTripPageState extends State<ActiveTripPage>
               left: 0,
               right: 0,
               child: _phase == TripPhase.tripCompleted
-                  ? TripCompletedPanel(
-                      price: widget.trip.offeredPrice,
-                      rating: _clientRating,
-                      onRatingChanged: (r) =>
-                          setState(() => _clientRating = r),
-                      onCommentChanged: (_) {},
-                      onReportProblem: () {},
-                      onFinish: () => context.go('/home'),
-                    )
+                  ? !_paymentConfirmed
+                      ? PaymentCollectionPanel(
+                          price: widget.trip.offeredPrice,
+                          clientName: widget.trip.clientName,
+                          paymentMethodLabel: widget.trip.paymentMethodLabel,
+                          onConfirm: _onPaymentConfirmed,
+                        )
+                      : TripCompletedPanel(
+                          price: widget.trip.offeredPrice,
+                          rating: _clientRating,
+                          onRatingChanged: (r) =>
+                              setState(() => _clientRating = r),
+                          onCommentChanged: (c) => _feedbackComment = c,
+                          onReportProblem: _onReportProblem,
+                          onFinish: _onFinish,
+                        )
                   : _phase != TripPhase.arrivedAtClient
                       ? ActiveTripPanel(
                           clientName: widget.trip.clientName,
