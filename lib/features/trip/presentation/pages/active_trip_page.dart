@@ -16,6 +16,7 @@ import 'package:kz_servicos_prestador/features/trip/data/services/directions_ser
 import 'package:kz_servicos_prestador/features/trip/domain/trip_phase.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/helpers/external_nav_helper.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/widgets/active_trip_panels.dart';
+import 'package:kz_servicos_prestador/core/services/navigation_audio_service.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/widgets/navigation_instruction_banner.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/widgets/phase_badge.dart';
 
@@ -39,6 +40,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   List<RouteStep> _routeSteps = [];
   int _currentStepIndex = 0;
   final _directionsService = DirectionsService();
+  final _audioService = NavigationAudioService();
 
   LatLng _currentLocation = const LatLng(-23.5505, -46.6333);
   double _currentHeading = 0;
@@ -73,6 +75,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
 
   @override
   void dispose() {
+    _audioService.stop();
     _positionStream?.cancel();
     _gpsPublishTimer?.cancel();
     _pulseAnimator?.dispose();
@@ -174,7 +177,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   }
 
   void _speakInstruction(String instruction) {
-    // implemented in Task 15
+    _audioService.speak(instruction);
   }
 
   void _updateCamera() {
@@ -257,6 +260,9 @@ class _ActiveTripPageState extends State<ActiveTripPage>
       _routeSteps = result.steps;
       _currentStepIndex = 0;
     });
+    if (result.steps.isNotEmpty) {
+      _speakInstruction(result.steps[0].instruction);
+    }
     _pulseAnimator?.start(result.polyline);
   }
 
