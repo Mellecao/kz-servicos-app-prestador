@@ -1,6 +1,8 @@
 class TripData {
   final String tripId;
   final String candidateId;
+  final String? clientId;         // trips.client_id (FK → users)
+  final String? candidateStatus;  // trip_driver_candidates.status
   final String clientName;
   final String? clientPhone;
   final String origin;
@@ -27,6 +29,8 @@ class TripData {
   const TripData({
     required this.tripId,
     required this.candidateId,
+    this.clientId,
+    this.candidateStatus,
     required this.clientName,
     this.clientPhone,
     required this.origin,
@@ -56,21 +60,27 @@ class TripData {
   bool get hasChildren => childrenCount > 0;
   bool get hasLuggage => luggageCount > 0;
 
+  bool get isAwaitingKzApproval =>
+      status == 'searching_drivers' && candidateStatus == 'accepted';
+
   bool get canDriverRespond =>
       status == 'searching_drivers' || status == 'awaiting_driver_confirmation';
 
-  String get statusLabel => switch (status) {
-        'open' => 'Aberta',
-        'under_review' => 'Em análise',
-        'searching_drivers' => 'Buscando motoristas',
-        'awaiting_driver_confirmation' => 'Aguardando confirmação',
-        'awaiting_client_confirmation' => 'Aguardando aprovação do cliente',
-        'scheduled' => 'Agendado',
-        'started' => 'Em andamento',
-        'finished' => 'Finalizado',
-        'cancelled' => 'Cancelado',
-        _ => status,
-      };
+  String get statusLabel {
+    if (isAwaitingKzApproval) return 'Aguardando aprovação da KZ';
+    return switch (status) {
+      'open' => 'Aberta',
+      'under_review' => 'Em análise',
+      'searching_drivers' => 'Buscando motoristas',
+      'awaiting_driver_confirmation' => 'Aguardando confirmação',
+      'awaiting_client_confirmation' => 'Aguardando passageiro aceitar',
+      'scheduled' => 'Agendada',
+      'started' => 'Em andamento',
+      'finished' => 'Finalizado',
+      'cancelled' => 'Cancelado',
+      _ => status,
+    };
+  }
 
   String get paymentMethodLabel => switch (paymentMethod) {
         'pix' => 'PIX',
@@ -112,6 +122,8 @@ class TripData {
     return TripData(
       tripId: map['id'] as String,
       candidateId: map['candidate_id'] as String? ?? '',
+      clientId: map['client_id'] as String?,
+      candidateStatus: map['candidate_status'] as String?,
       clientName: clientMap['full_name'] as String? ?? 'Cliente',
       clientPhone: clientMap['phone'] as String?,
       origin: pickup['formatted_address'] as String? ?? '',
