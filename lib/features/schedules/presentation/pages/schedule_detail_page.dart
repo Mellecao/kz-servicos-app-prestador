@@ -406,6 +406,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
       id: _trip.tripId,
       candidateId: '',
       clientName: _trip.clientName,
+      clientId: _trip.clientId,
       pickupAddress: _trip.origin,
       destinationAddress: _trip.destination,
       pickupLat: _trip.originLat,
@@ -414,6 +415,8 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
       destinationLng: _trip.destinationLng,
       passengerCount: _trip.passengerCount,
       offeredPrice: _trip.price,
+      paymentMethod: _trip.paymentMethod,
+      scheduledAt: _trip.scheduledAt,
     );
     if (!mounted) return;
     context.push('/active-trip', extra: activeTripData);

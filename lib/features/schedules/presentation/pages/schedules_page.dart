@@ -5,6 +5,8 @@ import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
 import 'package:kz_servicos_prestador/core/widgets/provider_bottom_nav.dart';
+import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 class SchedulesPage extends StatefulWidget {
   final ValueChanged<int> onNavTap;
@@ -21,13 +23,50 @@ class _SchedulesPageState extends State<SchedulesPage> {
   List<TripData> _invitationTrips = [];
   bool _loading = true;
   String _activeFilter = 'Todos';
+  RealtimeChannel? _tripsChannel;
 
   static const _filters = ['Todos', 'Agendado', 'Aguardando aprovação'];
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _load().then((_) => _subscribeToTrips());
+  }
+
+  @override
+  void dispose() {
+    _tripsChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribeToTrips() {
+    final driverProfileId = AuthState.driverProfileId;
+    if (driverProfileId == null) return;
+    _tripsChannel = Supabase.instance.client
+        .channel('driver-schedules-$driverProfileId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'trip_driver_candidates',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'driver_profile_id',
+            value: driverProfileId,
+          ),
+          callback: (_) => _load(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'trips',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'driver_profile_id',
+            value: driverProfileId,
+          ),
+          callback: (_) => _load(),
+        )
+        .subscribe();
   }
 
   Future<void> _load() async {
@@ -48,13 +87,32 @@ class _SchedulesPageState extends State<SchedulesPage> {
   Future<void> _startTrip(TripData trip) async {
     final ok = await _tripService.startTrip(trip.tripId);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(ok ? 'Viagem iniciada!' : 'Erro ao iniciar viagem'),
-        backgroundColor: ok ? const Color(0xFF2ECC71) : Colors.red.shade400,
-      ),
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Erro ao iniciar viagem'),
+          backgroundColor: Colors.red.shade400,
+        ),
+      );
+      return;
+    }
+    final activeTripData = ActiveTripData(
+      id: trip.tripId,
+      candidateId: '',
+      clientName: trip.clientName,
+      clientId: trip.clientId,
+      pickupAddress: trip.origin,
+      destinationAddress: trip.destination,
+      pickupLat: trip.originLat,
+      pickupLng: trip.originLng,
+      destinationLat: trip.destinationLat,
+      destinationLng: trip.destinationLng,
+      passengerCount: trip.passengerCount,
+      offeredPrice: trip.price,
+      paymentMethod: trip.paymentMethod,
+      scheduledAt: trip.scheduledAt,
     );
-    if (ok) _load();
+    context.push('/active-trip', extra: activeTripData);
   }
 
   List<TripData> get _filtered {
@@ -201,13 +259,16 @@ class _ScheduleCard extends StatelessWidget {
     this.onStartTrip,
   });
 
-  Color get _statusColor => switch (trip.status) {
-        'awaiting_client_confirmation' => Colors.orange,
-        'awaiting_driver_confirmation' => AppColors.secondary,
-        'searching_drivers' => AppColors.secondary,
-        'scheduled' => const Color(0xFF2ECC71),
-        _ => AppColors.textSecondary,
-      };
+  Color get _statusColor {
+    if (trip.isAwaitingKzApproval) return const Color(0xFFE65100);
+    return switch (trip.status) {
+      'awaiting_client_confirmation' => AppColors.secondary,
+      'awaiting_driver_confirmation' => AppColors.secondary,
+      'searching_drivers' => AppColors.secondary,
+      'scheduled' => const Color(0xFF2ECC71),
+      _ => AppColors.textSecondary,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
