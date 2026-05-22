@@ -8,6 +8,9 @@ class NavigationAudioService {
 
   final FlutterTts _tts = FlutterTts();
   bool _initialized = false;
+  bool _muted = false;
+
+  bool get isMuted => _muted;
 
   Future<void> _init() async {
     if (_initialized) return;
@@ -22,7 +25,13 @@ class NavigationAudioService {
     }
   }
 
+  void toggleMute() {
+    _muted = !_muted;
+    if (_muted) stop();
+  }
+
   Future<void> speak(String text) async {
+    if (_muted) return;
     await _init();
     try {
       await _tts.stop();
