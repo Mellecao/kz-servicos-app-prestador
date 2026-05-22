@@ -29,6 +29,12 @@
 | `test/core/models/trip_data_test.dart` | **Criar** |
 | `test/core/services/scheduled_trips_service_test.dart` | **Criar** |
 | `test/features/home/widgets/scheduled_trips_carousel_test.dart` | **Criar** |
+| `lib/features/trip/data/models/route_result.dart` | **Criar** — RouteStep + RouteResult |
+| `lib/features/trip/data/services/directions_service_mobile.dart` | Modificar — retornar RouteResult com steps |
+| `lib/features/trip/presentation/widgets/navigation_instruction_banner.dart` | **Criar** — banner estilo Waze |
+| `lib/core/services/navigation_audio_service.dart` | **Criar** — TTS PT-BR |
+| `lib/core/utils/custom_map_markers.dart` | Modificar — adicionar `createNavCarIcon()` |
+| `pubspec.yaml` | Modificar — adicionar `flutter_tts` |
 
 ---
 
@@ -1819,6 +1825,990 @@ git commit -m "feat(trip): adiciona tela de cobrança e feedback aprimorado ao f
 
 ---
 
+## Task 11: Botão "Ligar para o passageiro"
+
+**Files:**
+- Modify: `lib/features/trip/data/models/active_trip_data.dart`
+- Modify: `lib/features/schedules/presentation/pages/schedules_page.dart`
+- Modify: `lib/features/schedules/presentation/pages/schedule_detail_page.dart`
+- Modify: `lib/features/trip/presentation/widgets/active_trip_panels.dart`
+- Modify: `lib/features/trip/presentation/pages/active_trip_page.dart`
+
+- [ ] **Step 1: Adicionar `clientPhone` em `ActiveTripData`**
+
+Em `lib/features/trip/data/models/active_trip_data.dart`, adicionar o campo e atualizar o construtor e `fromSupabase()`.
+
+Adicionar em `ActiveTripData` (após `clientId`):
+
+```dart
+final String? clientPhone;
+```
+
+Adicionar ao construtor (após `this.clientId,`):
+
+```dart
+this.clientPhone,
+```
+
+Em `fromSupabase()`, adicionar ao `return ActiveTripData(...)` (após `clientId: ...`):
+
+```dart
+clientPhone: clientUser?['phone'] as String?,
+```
+
+- [ ] **Step 2: Passar `clientPhone` na construção de `ActiveTripData` em `schedules_page.dart`**
+
+Localizar `_startTrip()` em `lib/features/schedules/presentation/pages/schedules_page.dart` e adicionar ao `ActiveTripData(...)`:
+
+```dart
+clientPhone: trip.clientPhone,
+```
+
+- [ ] **Step 3: Passar `clientPhone` em `schedule_detail_page.dart` + adicionar botão de ligar**
+
+Em `lib/features/schedules/presentation/pages/schedule_detail_page.dart`:
+
+3a. No `_startTrip()`, adicionar ao `ActiveTripData(...)`:
+
+```dart
+clientPhone: _trip.clientPhone,
+```
+
+3b. Localizar `_buildStartBar()` e substituir integralmente:
+
+```dart
+Widget _buildStartBar() {
+  final phone = _trip.clientPhone;
+  return Container(
+    padding: EdgeInsets.fromLTRB(
+      24, 16, 24, MediaQuery.of(context).padding.bottom + 16,
+    ),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.05),
+          blurRadius: 10,
+          offset: const Offset(0, -4),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        if (phone != null && phone.isNotEmpty) ...[
+          SizedBox(
+            height: 52,
+            width: 52,
+            child: OutlinedButton(
+              onPressed: () => launchUrl(
+                Uri.parse('tel:$phone'),
+                mode: LaunchMode.externalApplication,
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF2ECC71),
+                side: const BorderSide(color: Color(0xFF2ECC71), width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                padding: EdgeInsets.zero,
+              ),
+              child: const Icon(Icons.phone_outlined, size: 22),
+            ),
+          ),
+          const SizedBox(width: 12),
+        ],
+        Expanded(
+          child: SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _startTrip,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2ECC71),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'Iniciar corrida',
+                      style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 15),
+                    ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+```
+
+Adicionar import no topo do arquivo:
+
+```dart
+import 'package:url_launcher/url_launcher.dart';
+```
+
+- [ ] **Step 4: Adicionar `onCall` em `ArrivedAtClientPanel`**
+
+Em `lib/features/trip/presentation/widgets/active_trip_panels.dart`, substituir a classe `ArrivedAtClientPanel` integralmente:
+
+```dart
+class ArrivedAtClientPanel extends StatelessWidget {
+  final ActiveTripData trip;
+  final VoidCallback onStart;
+  final VoidCallback onCall;
+
+  const ArrivedAtClientPanel({
+    super.key,
+    required this.trip,
+    required this.onStart,
+    required this.onCall,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 24, 20, bottomPadding + 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 24,
+            offset: const Offset(0, -6),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.location_on_rounded,
+            color: AppColors.highlight,
+            size: 40,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Você chegou ao local de embarque',
+            style: TextStyle(
+              fontFamily: 'OutfitBlack',
+              fontSize: 16,
+              color: AppColors.textPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          _ArrivedDetailRow(icon: Icons.person_outline, label: trip.clientName),
+          const SizedBox(height: 6),
+          _ArrivedDetailRow(icon: Icons.flag_outlined, label: trip.destinationAddress),
+          const SizedBox(height: 6),
+          _ArrivedDetailRow(
+            icon: Icons.people_outline,
+            label: '${trip.passengerCount} passageiro(s)',
+          ),
+          const SizedBox(height: 6),
+          _ArrivedDetailRow(
+            icon: Icons.attach_money,
+            label: 'R\$ ${trip.offeredPrice.toStringAsFixed(2)}',
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              if (trip.clientPhone != null && trip.clientPhone!.isNotEmpty) ...[
+                SizedBox(
+                  height: 52,
+                  width: 52,
+                  child: OutlinedButton(
+                    onPressed: onCall,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF2ECC71),
+                      side: const BorderSide(color: Color(0xFF2ECC71), width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: const Icon(Icons.phone_outlined, size: 22),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: onStart,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2ECC71),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Iniciar corrida',
+                      style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 16),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+```
+
+- [ ] **Step 5: Implementar `_onCall()` em `ActiveTripPage` e passar para os painéis**
+
+Em `lib/features/trip/presentation/pages/active_trip_page.dart`:
+
+5a. Adicionar método `_onCall()` após `_onReportProblem()`:
+
+```dart
+void _onCall() {
+  final phone = widget.trip.clientPhone;
+  if (phone == null || phone.isEmpty) return;
+  launchUrl(
+    Uri.parse('tel:$phone'),
+    mode: LaunchMode.externalApplication,
+  );
+}
+```
+
+5b. No `build()`, atualizar o `ArrivedAtClientPanel(...)`:
+
+```dart
+ArrivedAtClientPanel(
+  trip: widget.trip,
+  onStart: _advancePhase,
+  onCall: _onCall,  // ADD
+),
+```
+
+5c. No `build()`, atualizar o `ActiveTripPanel(...)`:
+
+```dart
+ActiveTripPanel(
+  clientName: widget.trip.clientName,
+  subtitle: _phase.subtitle(widget.trip),
+  phaseColor: _phase.color,
+  buttonLabel: _phase.buttonLabel,
+  onAdvance: _advancePhase,
+  onChat: () => context.push('/chat/0'),
+  onCall: _onCall,  // was () {}
+),
+```
+
+- [ ] **Step 6: Verificar análise estática**
+
+```
+flutter analyze lib/features/trip/data/models/active_trip_data.dart lib/features/trip/presentation/widgets/active_trip_panels.dart lib/features/trip/presentation/pages/active_trip_page.dart lib/features/schedules/presentation/pages/schedule_detail_page.dart
+```
+
+Esperado: sem erros.
+
+- [ ] **Step 7: Commit**
+
+```
+git add lib/features/trip/data/models/active_trip_data.dart lib/features/trip/presentation/widgets/active_trip_panels.dart lib/features/trip/presentation/pages/active_trip_page.dart lib/features/schedules/presentation/pages/schedules_page.dart lib/features/schedules/presentation/pages/schedule_detail_page.dart
+git commit -m "feat(trip): botão de ligar para passageiro em corrida ativa, chegada ao cliente e detalhe de agendamento"
+```
+
+---
+
+## Task 12: Ícone de carro GPS (substituir triângulo azul)
+
+**Files:**
+- Modify: `lib/core/utils/custom_map_markers.dart`
+- Modify: `lib/features/trip/presentation/pages/active_trip_page.dart`
+
+- [ ] **Step 1: Adicionar `createNavCarIcon()` em `custom_map_markers.dart`**
+
+Em `lib/core/utils/custom_map_markers.dart`, adicionar o novo método na classe `CustomMapMarkers` após `createBlueTriangleIcon()`:
+
+```dart
+static Future<BitmapDescriptor> createNavCarIcon() async {
+  const size = 44.0;
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+
+  // Borda branca
+  canvas.drawCircle(
+    const Offset(size / 2, size / 2),
+    size / 2,
+    Paint()..color = Colors.white,
+  );
+
+  // Círculo azul de fundo
+  canvas.drawCircle(
+    const Offset(size / 2, size / 2),
+    size / 2 - 2,
+    Paint()..color = const Color(0xFF1976D2),
+  );
+
+  // Seta de navegação (chevron apontando para cima)
+  final arrowPath = Path()
+    ..moveTo(size / 2, 7)          // ponta superior
+    ..lineTo(size - 8, size - 7)   // canto inferior direito
+    ..lineTo(size / 2, size - 15)  // entalhe inferior central
+    ..lineTo(8, size - 7)          // canto inferior esquerdo
+    ..close();
+
+  canvas.drawPath(arrowPath, Paint()..color = Colors.white);
+
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(size.toInt(), size.toInt());
+  final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+  return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
+}
+```
+
+- [ ] **Step 2: Substituir triângulo azul pelo ícone de carro em `active_trip_page.dart`**
+
+Em `lib/features/trip/presentation/pages/active_trip_page.dart`:
+
+2a. Renomear o campo de `_blueTriangleIcon` para `_navCarIcon`:
+
+```dart
+BitmapDescriptor? _navCarIcon;  // era: BitmapDescriptor? _blueTriangleIcon;
+```
+
+2b. Em `_initIcons()`, substituir a chamada:
+
+```dart
+final results = await Future.wait([
+  CustomMapMarkers.createYellowPinIcon(),
+  CustomMapMarkers.createYellowCircleIcon(),
+  CustomMapMarkers.createNavCarIcon(),   // era: createBlueTriangleIcon()
+]);
+_yellowPinIcon = results[0];
+_yellowCircleIcon = results[1];
+_navCarIcon = results[2];               // era: _blueTriangleIcon
+```
+
+2c. Em `_rebuildMarkers()`, substituir a referência:
+
+```dart
+if (_navCarIcon != null) {
+  markers.add(Marker(
+    markerId: const MarkerId('driver'),
+    position: _currentLocation,
+    icon: _navCarIcon!,           // era: _blueTriangleIcon!
+    rotation: _currentHeading,
+    anchor: const Offset(0.5, 0.5),
+    zIndexInt: 10,
+  ));
+}
+```
+
+2d. Em `_updateCamera()`, ajustar tilt para 65° (mais imersivo):
+
+```dart
+void _updateCamera() {
+  if (_mapController == null || !_phase.isGpsMode) return;
+  _mapController!.animateCamera(
+    CameraUpdate.newCameraPosition(CameraPosition(
+      target: _currentLocation,
+      zoom: 17.5,          // era: 17
+      tilt: 65,            // era: 60
+      bearing: _currentHeading,
+    )),
+  );
+}
+```
+
+2e. Atualizar `initialCameraPosition` no `GoogleMap(...)` do `build()` para manter consistência:
+
+```dart
+initialCameraPosition: CameraPosition(
+  target: _pickup,
+  zoom: 17.5,    // era: 17
+  tilt: 65,      // era: 60
+),
+```
+
+- [ ] **Step 3: Verificar análise estática**
+
+```
+flutter analyze lib/core/utils/custom_map_markers.dart lib/features/trip/presentation/pages/active_trip_page.dart
+```
+
+Esperado: sem erros.
+
+- [ ] **Step 4: Commit**
+
+```
+git add lib/core/utils/custom_map_markers.dart lib/features/trip/presentation/pages/active_trip_page.dart
+git commit -m "feat(map): substitui triângulo azul por ícone de carro GPS e aumenta tilt da câmera para 65°"
+```
+
+---
+
+## Task 13: DirectionsService — dados de curvas para navegação turn-by-turn
+
+**Files:**
+- Create: `lib/features/trip/data/models/route_result.dart`
+- Modify: `lib/features/trip/data/services/directions_service_mobile.dart`
+- Modify: `lib/features/trip/presentation/pages/active_trip_page.dart`
+
+- [ ] **Step 1: Criar `lib/features/trip/data/models/route_result.dart`**
+
+```dart
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+class RouteStep {
+  final String instruction;
+  final String distanceText;
+  final double distanceMeters;
+  final String? maneuver;
+  final LatLng endLocation;
+
+  const RouteStep({
+    required this.instruction,
+    required this.distanceText,
+    required this.distanceMeters,
+    this.maneuver,
+    required this.endLocation,
+  });
+}
+
+class RouteResult {
+  final List<LatLng> polyline;
+  final List<RouteStep> steps;
+
+  const RouteResult({required this.polyline, required this.steps});
+
+  static const empty = RouteResult(polyline: [], steps: []);
+}
+```
+
+- [ ] **Step 2: Atualizar `directions_service_mobile.dart` para retornar `RouteResult`**
+
+Substituir o conteúdo completo de `lib/features/trip/data/services/directions_service_mobile.dart`:
+
+```dart
+import 'dart:convert';
+
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:kz_servicos_prestador/features/trip/data/models/route_result.dart';
+
+class DirectionsService {
+  static const String _apiKey = 'AIzaSyChT4wSYd-b3fT7xfEvUvmgJ0QfZv7MYSE';
+
+  final http.Client _client;
+
+  DirectionsService({http.Client? client})
+      : _client = client ?? http.Client();
+
+  Future<RouteResult> fetchRoute({
+    required LatLng origin,
+    required LatLng destination,
+    List<LatLng> waypoints = const [],
+  }) async {
+    final params = <String, String>{
+      'origin': '${origin.latitude},${origin.longitude}',
+      'destination': '${destination.latitude},${destination.longitude}',
+      'key': _apiKey,
+      'language': 'pt-BR',
+    };
+    if (waypoints.isNotEmpty) {
+      params['waypoints'] =
+          waypoints.map((wp) => '${wp.latitude},${wp.longitude}').join('|');
+    }
+    final uri = Uri.https(
+      'maps.googleapis.com',
+      '/maps/api/directions/json',
+      params,
+    );
+
+    try {
+      final response = await _client.get(uri);
+      if (response.statusCode != 200) return RouteResult.empty;
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final routes = data['routes'] as List?;
+      if (routes == null || routes.isEmpty) return RouteResult.empty;
+
+      final route = routes[0] as Map<String, dynamic>;
+      final polyline = route['overview_polyline']['points'] as String;
+      final points = _decodePolyline(polyline);
+
+      final legs = route['legs'] as List?;
+      final steps = <RouteStep>[];
+      if (legs != null && legs.isNotEmpty) {
+        final rawSteps = (legs[0] as Map<String, dynamic>)['steps'] as List;
+        for (final s in rawSteps) {
+          final step = s as Map<String, dynamic>;
+          final endLoc = step['end_location'] as Map<String, dynamic>;
+          final distMap = step['distance'] as Map<String, dynamic>;
+          steps.add(RouteStep(
+            instruction: _stripHtml(step['html_instructions'] as String),
+            distanceText: distMap['text'] as String,
+            distanceMeters: (distMap['value'] as num).toDouble(),
+            maneuver: step['maneuver'] as String?,
+            endLocation: LatLng(
+              (endLoc['lat'] as num).toDouble(),
+              (endLoc['lng'] as num).toDouble(),
+            ),
+          ));
+        }
+      }
+
+      return RouteResult(polyline: points, steps: steps);
+    } catch (_) {
+      return RouteResult.empty;
+    }
+  }
+
+  String _stripHtml(String html) =>
+      html.replaceAll(RegExp(r'<[^>]*>'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  List<LatLng> _decodePolyline(String encoded) {
+    final points = <LatLng>[];
+    int index = 0;
+    int lat = 0;
+    int lng = 0;
+
+    while (index < encoded.length) {
+      int shift = 0;
+      int result = 0;
+      int byte;
+      do {
+        byte = encoded.codeUnitAt(index++) - 63;
+        result |= (byte & 0x1F) << shift;
+        shift += 5;
+      } while (byte >= 0x20);
+      lat += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+
+      shift = 0;
+      result = 0;
+      do {
+        byte = encoded.codeUnitAt(index++) - 63;
+        result |= (byte & 0x1F) << shift;
+        shift += 5;
+      } while (byte >= 0x20);
+      lng += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+
+      points.add(LatLng(lat / 1e5, lng / 1e5));
+    }
+
+    return points;
+  }
+}
+```
+
+- [ ] **Step 3: Atualizar `_fetchRouteForPhase()` em `active_trip_page.dart`**
+
+Em `lib/features/trip/presentation/pages/active_trip_page.dart`:
+
+3a. Adicionar import:
+
+```dart
+import 'package:kz_servicos_prestador/features/trip/data/models/route_result.dart';
+```
+
+3b. Adicionar campos de estado na classe `_ActiveTripPageState`:
+
+```dart
+List<RouteStep> _routeSteps = [];
+int _currentStepIndex = 0;
+```
+
+3c. Substituir o método `_fetchRouteForPhase()`:
+
+```dart
+Future<void> _fetchRouteForPhase() async {
+  _pulseAnimator?.stop();
+  LatLng target;
+  switch (_phase) {
+    case TripPhase.navigatingToClient:
+      target = _pickup;
+    case TripPhase.tripInProgress:
+      target = _destination;
+    default:
+      setState(() {
+        _polylines = {};
+        _routeSteps = [];
+        _currentStepIndex = 0;
+      });
+      return;
+  }
+  final result = await _directionsService.fetchRoute(
+    origin: _currentLocation,
+    destination: target,
+  );
+  if (result.polyline.isEmpty || !mounted) return;
+  setState(() {
+    _polylines = {
+      Polyline(
+        polylineId: const PolylineId('route_glow'),
+        points: result.polyline,
+        color: AppColors.highlight.withValues(alpha: 0.18),
+        width: 10,
+      ),
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: result.polyline,
+        color: AppColors.highlight,
+        width: 5,
+      ),
+    };
+    _routeSteps = result.steps;
+    _currentStepIndex = 0;
+  });
+  _pulseAnimator?.start(result.polyline);
+}
+```
+
+- [ ] **Step 4: Verificar análise estática**
+
+```
+flutter analyze lib/features/trip/data/models/route_result.dart lib/features/trip/data/services/directions_service_mobile.dart lib/features/trip/presentation/pages/active_trip_page.dart
+```
+
+Esperado: sem erros.
+
+- [ ] **Step 5: Commit**
+
+```
+git add lib/features/trip/data/models/route_result.dart lib/features/trip/data/services/directions_service_mobile.dart lib/features/trip/presentation/pages/active_trip_page.dart
+git commit -m "feat(navigation): DirectionsService retorna RouteResult com steps de curvas em PT-BR"
+```
+
+---
+
+## Task 14: NavigationInstructionBanner (estilo Waze)
+
+**Files:**
+- Create: `lib/features/trip/presentation/widgets/navigation_instruction_banner.dart`
+- Modify: `lib/features/trip/presentation/pages/active_trip_page.dart`
+
+- [ ] **Step 1: Criar `lib/features/trip/presentation/widgets/navigation_instruction_banner.dart`**
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
+import 'package:kz_servicos_prestador/features/trip/data/models/route_result.dart';
+
+class NavigationInstructionBanner extends StatelessWidget {
+  final RouteStep step;
+  final Color phaseColor;
+
+  const NavigationInstructionBanner({
+    super.key,
+    required this.step,
+    required this.phaseColor,
+  });
+
+  IconData get _arrowIcon => switch (step.maneuver) {
+        'turn-right' || 'ramp-right' || 'fork-right' || 'merge-right' =>
+          Icons.turn_right,
+        'turn-left' || 'ramp-left' || 'fork-left' || 'merge-left' =>
+          Icons.turn_left,
+        'turn-sharp-right' => Icons.turn_sharp_right,
+        'turn-sharp-left' => Icons.turn_sharp_left,
+        'turn-slight-right' => Icons.turn_slight_right,
+        'turn-slight-left' => Icons.turn_slight_left,
+        'uturn-right' || 'uturn-left' => Icons.u_turn_right,
+        'roundabout-right' => Icons.roundabout_right,
+        'roundabout-left' => Icons.roundabout_left,
+        'straight' => Icons.straight,
+        _ => Icons.navigation,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: phaseColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(_arrowIcon, color: phaseColor, size: 28),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  step.distanceText,
+                  style: const TextStyle(
+                    fontFamily: 'OutfitBlack',
+                    fontSize: 17,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  step.instruction,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+```
+
+- [ ] **Step 2: Adicionar banner e lógica de step atual em `active_trip_page.dart`**
+
+2a. Adicionar import no topo:
+
+```dart
+import 'package:geolocator/geolocator.dart' show Geolocator;
+import 'package:kz_servicos_prestador/features/trip/presentation/widgets/navigation_instruction_banner.dart';
+```
+
+> Nota: `geolocator` já está importado no arquivo via `import 'package:geolocator/geolocator.dart'` — use `Geolocator.distanceBetween` diretamente.
+
+2b. Adicionar método `_updateCurrentStep()` após `_onPositionUpdate()`:
+
+```dart
+void _updateCurrentStep() {
+  if (_routeSteps.isEmpty) return;
+  for (int i = _currentStepIndex; i < _routeSteps.length; i++) {
+    final end = _routeSteps[i].endLocation;
+    final dist = Geolocator.distanceBetween(
+      _currentLocation.latitude, _currentLocation.longitude,
+      end.latitude, end.longitude,
+    );
+    if (dist > 25) {
+      // Ainda não chegamos ao fim deste step
+      if (_currentStepIndex != i) {
+        setState(() => _currentStepIndex = i);
+        _speakInstruction(_routeSteps[i].instruction);
+      }
+      return;
+    }
+    // Chegamos ao fim deste step — avança para o próximo
+  }
+}
+```
+
+2c. Chamar `_updateCurrentStep()` dentro de `_onPositionUpdate()`, após `_updateCamera()`:
+
+```dart
+void _onPositionUpdate(Position position) {
+  if (!mounted) return;
+  setState(() {
+    _currentLocation = LatLng(position.latitude, position.longitude);
+    _currentHeading = position.heading;
+  });
+  _rebuildMarkers();
+  _updateCamera();
+  _updateCurrentStep();  // ADD
+}
+```
+
+2d. No método `build()`, adicionar o banner no Stack (após o back button, antes do PhaseBadge). Adicionar logo após o `Positioned` do botão de voltar:
+
+```dart
+// Banner de instrução de navegação (só durante navegação GPS com steps disponíveis)
+if (_phase.isGpsMode &&
+    _routeSteps.isNotEmpty &&
+    _currentStepIndex < _routeSteps.length)
+  Positioned(
+    top: topPadding + 58,  // abaixo do back button e badge
+    left: 0,
+    right: 0,
+    child: NavigationInstructionBanner(
+      step: _routeSteps[_currentStepIndex],
+      phaseColor: _phase.color,
+    ),
+  ),
+```
+
+- [ ] **Step 3: Verificar análise estática**
+
+```
+flutter analyze lib/features/trip/presentation/widgets/navigation_instruction_banner.dart lib/features/trip/presentation/pages/active_trip_page.dart
+```
+
+Esperado: sem erros.
+
+- [ ] **Step 4: Commit**
+
+```
+git add lib/features/trip/presentation/widgets/navigation_instruction_banner.dart lib/features/trip/presentation/pages/active_trip_page.dart
+git commit -m "feat(navigation): banner de instrução de curva estilo Waze com ícone e distância em PT-BR"
+```
+
+---
+
+## Task 15: Narração GPS com flutter_tts (PT-BR)
+
+**Files:**
+- Modify: `pubspec.yaml`
+- Create: `lib/core/services/navigation_audio_service.dart`
+- Modify: `lib/features/trip/presentation/pages/active_trip_page.dart`
+
+- [ ] **Step 1: Adicionar `flutter_tts` ao `pubspec.yaml`**
+
+Em `pubspec.yaml`, adicionar após `url_launcher: ^6.3.2`:
+
+```yaml
+  flutter_tts: ^4.2.0
+```
+
+Rodar:
+
+```
+flutter pub get
+```
+
+Esperado: dependência resolvida sem conflitos.
+
+- [ ] **Step 2: Criar `lib/core/services/navigation_audio_service.dart`**
+
+```dart
+import 'package:flutter/foundation.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+
+class NavigationAudioService {
+  static final NavigationAudioService _instance = NavigationAudioService._();
+  factory NavigationAudioService() => _instance;
+  NavigationAudioService._();
+
+  final FlutterTts _tts = FlutterTts();
+  bool _initialized = false;
+
+  Future<void> _init() async {
+    if (_initialized) return;
+    try {
+      await _tts.setLanguage('pt-BR');
+      await _tts.setSpeechRate(0.48);
+      await _tts.setVolume(1.0);
+      await _tts.setPitch(1.0);
+      _initialized = true;
+    } catch (e) {
+      debugPrint('[NavigationAudio] init erro: $e');
+    }
+  }
+
+  Future<void> speak(String text) async {
+    await _init();
+    try {
+      await _tts.stop();
+      await _tts.speak(text);
+    } catch (e) {
+      debugPrint('[NavigationAudio] speak erro: $e');
+    }
+  }
+
+  Future<void> stop() async {
+    try {
+      await _tts.stop();
+    } catch (_) {}
+  }
+}
+```
+
+- [ ] **Step 3: Integrar narração em `active_trip_page.dart`**
+
+3a. Adicionar import no topo:
+
+```dart
+import 'package:kz_servicos_prestador/core/services/navigation_audio_service.dart';
+```
+
+3b. Adicionar campo na classe `_ActiveTripPageState`:
+
+```dart
+final _audioService = NavigationAudioService();
+```
+
+3c. Adicionar método `_speakInstruction()`:
+
+```dart
+void _speakInstruction(String instruction) {
+  _audioService.speak(instruction);
+}
+```
+
+3d. Em `dispose()`, adicionar chamada de stop:
+
+```dart
+@override
+void dispose() {
+  _audioService.stop();
+  _positionStream?.cancel();
+  _gpsPublishTimer?.cancel();
+  _pulseAnimator?.dispose();
+  super.dispose();
+}
+```
+
+3e. Narrar a instrução do primeiro step ao buscar a rota — no final de `_fetchRouteForPhase()`, após atualizar `_routeSteps`, adicionar:
+
+```dart
+// Narrar a primeira instrução ao iniciar navegação
+if (result.steps.isNotEmpty) {
+  _speakInstruction(result.steps[0].instruction);
+}
+```
+
+Adicionar isso dentro do bloco `setState(...)` ou logo após.
+
+- [ ] **Step 4: Verificar análise estática e testes**
+
+```
+flutter analyze lib/core/services/navigation_audio_service.dart lib/features/trip/presentation/pages/active_trip_page.dart
+flutter test
+```
+
+Esperado: sem erros. Todos os testes PASS.
+
+- [ ] **Step 5: Commit**
+
+```
+git add pubspec.yaml pubspec.lock lib/core/services/navigation_audio_service.dart lib/features/trip/presentation/pages/active_trip_page.dart
+git commit -m "feat(navigation): narração GPS em PT-BR com flutter_tts ao iniciar e mudar de instrução"
+```
+
+---
+
 ## Verificação final
 
 Após completar todos os tasks, rodar:
@@ -1836,3 +2826,8 @@ E verificar manualmente no dispositivo/emulador:
 5. Tocar "Pagamento efetuado" → Supabase marca `is_driver_paied = true` → tela de feedback aparece
 6. Tocar "Relatar um problema" → WhatsApp abre com mensagem pré-preenchida
 7. Tocar "Finalizar" → rating salvo → navega para home
+8. Durante navegação → ícone de carro azul rotaciona com heading, câmera 3D a 65° segue o motorista
+9. Banner superior mostra próxima curva com ícone e distância em PT-BR (ex: "200 m · Vire à direita")
+10. Narração em voz PT-BR fala a instrução ao iniciar rota e ao avançar de step
+11. Botão de ligar aparece em: painel de corrida ativa, painel "chegou ao local", tela de detalhe da corrida (quando agendada)
+12. Tocar no botão de ligar → app de telefone abre com o número do passageiro
