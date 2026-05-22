@@ -50,7 +50,7 @@ class TripService {
     try {
       final res = await _client
           .from('trip_driver_candidates')
-          .select('status, trip:trips!trip_id($_tripSelect)')
+          .select('id, status, trip:trips!trip_id($_tripSelect)')
           .eq('driver_profile_id', driverProfileId)
           .eq('status', 'accepted');
       return (res as List)
