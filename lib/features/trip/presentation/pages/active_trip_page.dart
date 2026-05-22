@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -47,6 +48,11 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   LatLng _currentLocation = const LatLng(-23.5505, -46.6333);
   double _currentHeading = 0;
   StreamSubscription<Position>? _positionStream;
+  StreamSubscription<AccelerometerEvent>? _accelSub;
+  StreamSubscription<MagnetometerEvent>? _magSub;
+  Timer? _compassTimer;
+  List<double> _accelValues = [0, 0, 9.8];
+  List<double> _magValues = [0, 0, 0];
   Timer? _gpsPublishTimer;
   RoutePulseAnimator? _pulseAnimator;
 
@@ -81,12 +87,16 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     _initIcons();
     _initLocationTracking();
     _startGpsPublishing();
+    _startCompass();
   }
 
   @override
   void dispose() {
     _audioService.stop();
     _positionStream?.cancel();
+    _accelSub?.cancel();
+    _magSub?.cancel();
+    _compassTimer?.cancel();
     _gpsPublishTimer?.cancel();
     _pulseAnimator?.dispose();
     unawaited(_tripAudio.dispose());
@@ -138,6 +148,33 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     });
   }
 
+  void _startCompass() {
+    _accelSub = accelerometerEventStream(
+      samplingPeriod: SensorInterval.normalInterval,
+    ).listen((e) => _accelValues = [e.x, e.y, e.z]);
+
+    _magSub = magnetometerEventStream(
+      samplingPeriod: SensorInterval.normalInterval,
+    ).listen((e) => _magValues = [e.x, e.y, e.z]);
+
+    // Atualiza câmera com heading da bússola a ~10 fps
+    _compassTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!_phase.isGpsMode || !_cameraFollowing) return;
+      final heading = computeCompassHeading(_accelValues, _magValues);
+      final diff = (heading - _currentHeading + 360) % 360;
+      if (diff < 2 || diff > 358) return; // Sem mudança significativa
+      _currentHeading = heading;
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(CameraPosition(
+          target: _currentLocation,
+          zoom: 20,
+          tilt: 45,
+          bearing: _currentHeading,
+        )),
+      );
+    });
+  }
+
   Future<void> _publishLocation() async {
     if (!_phase.isGpsMode) return;
     try {
@@ -184,15 +221,18 @@ class _ActiveTripPageState extends State<ActiveTripPage>
       if (dist > 25) {
         if (_currentStepIndex != i) {
           setState(() => _currentStepIndex = i);
-          _speakInstruction(_routeSteps[i].instruction);
+          _speakStep(_routeSteps[i], dist);
         }
         return;
       }
     }
   }
 
-  void _speakInstruction(String instruction) {
-    _audioService.speak(instruction);
+  void _speakStep(RouteStep step, double remainingMeters) {
+    unawaited(_audioService.speakManeuver(
+      maneuver: step.maneuver,
+      distanceMeters: remainingMeters,
+    ));
   }
 
   void _updateCamera() {
@@ -276,14 +316,14 @@ class _ActiveTripPageState extends State<ActiveTripPage>
           polylineId: const PolylineId('route'),
           points: _fullRoutePoints,
           color: AppColors.highlight,
-          width: 7,
+          width: 14,
         ),
       };
       _routeSteps = result.steps;
       _currentStepIndex = 0;
     });
     if (result.steps.isNotEmpty) {
-      _speakInstruction(result.steps[0].instruction);
+      _speakStep(result.steps[0], result.steps[0].distanceMeters);
     }
     debugPrint('[KZ-R] rota: ${routePoints.length} pontos (API=${result.polyline.isNotEmpty})');
   }
@@ -313,7 +353,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
           polylineId: const PolylineId('route'),
           points: remaining,
           color: AppColors.highlight,
-          width: 7,
+          width: 14,
         ),
       };
     });

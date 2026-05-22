@@ -47,6 +47,7 @@ dependencies:
   url_launcher: ^6.3.2
   flutter_tts: ^4.2.0
   audioplayers: ^6.0.0
+  sensors_plus: ^6.1.0
   supabase_flutter: ^2.8.0
 
 dev_dependencies:
@@ -84,6 +85,7 @@ flutter:
     - assets/images/SVG/
     - assets/animations/
     - assets/audio/
+    - assets/audio/voice/pt-br/
 
   fonts:
     - family: OutfitBlack
