@@ -50,6 +50,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   bool _isAdvancing = false;
   bool _paymentConfirmed = false;
   bool _isMarkingPaid = false;
+  bool _isFinishing = false;
   String _feedbackComment = '';
 
   LatLng get _pickup =>
@@ -330,12 +331,17 @@ class _ActiveTripPageState extends State<ActiveTripPage>
       if (mounted) setState(() => _paymentConfirmed = true);
     } catch (e) {
       debugPrint('[KZ-P] _onPaymentConfirmed erro: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao registrar pagamento. Tente novamente.')),
+        );
+      }
     } finally {
       _isMarkingPaid = false;
     }
   }
 
-  void _onReportProblem() {
+  Future<void> _onReportProblem() async {
     final trip = widget.trip;
     final scheduledAt = trip.scheduledAt;
     final dateStr = scheduledAt != null
@@ -347,13 +353,20 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     final msg = Uri.encodeComponent(
       'Olá, tive um problema com o passageiro ${trip.clientName} na corrida de $dateStr às $timeStr, de ${trip.pickupAddress} para ${trip.destinationAddress}.',
     );
-    launchUrl(
+    final ok = await launchUrl(
       Uri.parse('https://wa.me/5511985889577?text=$msg'),
       mode: LaunchMode.externalApplication,
     );
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível abrir o WhatsApp.')),
+      );
+    }
   }
 
   Future<void> _onFinish() async {
+    if (_isFinishing) return;
+    _isFinishing = true;
     if (_clientRating > 0 && widget.trip.clientId != null) {
       try {
         await _supabase.from('ratings').insert({
