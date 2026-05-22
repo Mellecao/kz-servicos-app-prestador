@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="kz_servicos_prestador"
+        android:label="KZ Motorista"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -41,5 +41,9 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+    </queries>
+    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
     </queries>
 </manifest>

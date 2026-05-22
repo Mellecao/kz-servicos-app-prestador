@@ -114,10 +114,12 @@ class ActiveTripPanel extends StatelessWidget {
   }
 }
 
-class TripCompletedPanel extends StatelessWidget {
+class TripCompletedPanel extends StatefulWidget {
   final double price;
   final int rating;
   final ValueChanged<int> onRatingChanged;
+  final ValueChanged<String> onCommentChanged;
+  final VoidCallback onReportProblem;
   final VoidCallback onFinish;
 
   const TripCompletedPanel({
@@ -125,8 +127,23 @@ class TripCompletedPanel extends StatelessWidget {
     required this.price,
     required this.rating,
     required this.onRatingChanged,
+    required this.onCommentChanged,
+    required this.onReportProblem,
     required this.onFinish,
   });
+
+  @override
+  State<TripCompletedPanel> createState() => _TripCompletedPanelState();
+}
+
+class _TripCompletedPanelState extends State<TripCompletedPanel> {
+  final _commentController = TextEditingController();
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -147,47 +164,24 @@ class TripCompletedPanel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.check_circle_rounded,
-            color: Color(0xFF2ECC71),
-            size: 48,
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Viagem finalizada!',
-            style: TextStyle(
-              fontFamily: 'OutfitBlack',
-              fontSize: 20,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Valor: R\$ ${price.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontFamily: 'OutfitBlack',
-              fontSize: 24,
-              color: Color(0xFF2ECC71),
-            ),
-          ),
-          const SizedBox(height: 20),
           const Text(
             'Avalie o passageiro',
             style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
+              fontFamily: 'OutfitBlack',
+              fontSize: 18,
+              color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(5, (i) {
               return GestureDetector(
-                onTap: () => onRatingChanged(i + 1),
+                onTap: () => widget.onRatingChanged(i + 1),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Icon(
-                    i < rating ? Icons.star : Icons.star_border,
+                    i < widget.rating ? Icons.star : Icons.star_border,
                     color: AppColors.highlight,
                     size: 36,
                   ),
@@ -195,11 +189,46 @@ class TripCompletedPanel extends StatelessWidget {
               );
             }),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _commentController,
+            maxLines: 3,
+            onChanged: widget.onCommentChanged,
+            decoration: InputDecoration(
+              hintText: 'Observação sobre o passageiro (opcional)',
+              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+              filled: true,
+              fillColor: const Color(0xFFF7F7F8),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                    const BorderSide(color: AppColors.highlight, width: 1.5),
+              ),
+              contentPadding: const EdgeInsets.all(14),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: widget.onReportProblem,
+            icon: Icon(Icons.flag_outlined, color: Colors.red.shade400, size: 18),
+            label: Text(
+              'Relatar um problema',
+              style: TextStyle(
+                color: Colors.red.shade400,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: onFinish,
+              onPressed: widget.onFinish,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.highlight,
                 foregroundColor: Colors.white,
@@ -209,11 +238,8 @@ class TripCompletedPanel extends StatelessWidget {
                 ),
               ),
               child: const Text(
-                'Voltar ao início',
-                style: TextStyle(
-                  fontFamily: 'OutfitBlack',
-                  fontSize: 16,
-                ),
+                'Finalizar',
+                style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 16),
               ),
             ),
           ),

@@ -236,14 +236,26 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   }
 
   Future<void> _advancePhase() async {
-    if (_isAdvancing) return;
+    debugPrint('[KZ-P] _advancePhase START phase=$_phase isAdvancing=$_isAdvancing tripId=${widget.trip.id} uid=${_supabase.auth.currentUser?.id}');
+    if (_isAdvancing) {
+      debugPrint('[KZ-P] _advancePhase BLOCKED (already advancing)');
+      return;
+    }
     _isAdvancing = true;
     try {
       if (_phase == TripPhase.navigatingToClient) {
-        await _supabase
-            .from('trips')
-            .update({'driver_arrived_at': DateTime.now().toUtc().toIso8601String()})
-            .eq('id', widget.trip.id);
+        try {
+          debugPrint('[KZ-P] Calling UPDATE driver_arrived_at...');
+          final res = await _supabase
+              .from('trips')
+              .update({'driver_arrived_at': DateTime.now().toUtc().toIso8601String()})
+              .eq('id', widget.trip.id)
+              .select('id, driver_arrived_at, driver_profile_id, status');
+          debugPrint('[KZ-P] UPDATE driver_arrived_at OK rows=$res');
+        } catch (e, st) {
+          debugPrint('[KZ-P] UPDATE driver_arrived_at FAILED: $e\n$st');
+          rethrow;
+        }
         setState(() {
           _phase = TripPhase.arrivedAtClient;
           _showArrivedPopup = true;
@@ -256,24 +268,50 @@ class _ActiveTripPageState extends State<ActiveTripPage>
           ),
         );
       } else if (_phase == TripPhase.arrivedAtClient) {
-        await _supabase
-            .from('trips')
-            .update({'started_at': DateTime.now().toUtc().toIso8601String()})
-            .eq('id', widget.trip.id);
+        try {
+          debugPrint('[KZ-P] Calling UPDATE started_at...');
+          final res = await _supabase
+              .from('trips')
+              .update({'started_at': DateTime.now().toUtc().toIso8601String()})
+              .eq('id', widget.trip.id)
+              .select('id, started_at, status');
+          debugPrint('[KZ-P] UPDATE started_at OK rows=$res');
+        } catch (e, st) {
+          debugPrint('[KZ-P] UPDATE started_at FAILED: $e\n$st');
+          rethrow;
+        }
         setState(() {
           _phase = TripPhase.tripInProgress;
           _showArrivedPopup = false;
         });
         _fetchRouteForPhase();
       } else if (_phase == TripPhase.tripInProgress) {
+        try {
+          debugPrint('[KZ-P] Calling UPDATE finished_at + status=finished...');
+          final res = await _supabase
+              .from('trips')
+              .update({
+                'status': 'finished',
+                'finished_at': DateTime.now().toUtc().toIso8601String(),
+              })
+              .eq('id', widget.trip.id)
+              .select('id, finished_at, status');
+          debugPrint('[KZ-P] UPDATE finished_at OK rows=$res');
+        } catch (e, st) {
+          debugPrint('[KZ-P] UPDATE finished_at FAILED: $e\n$st');
+          rethrow;
+        }
         setState(() => _phase = TripPhase.tripCompleted);
         _pulseAnimator?.stop();
         _positionStream?.cancel();
         _gpsPublishTimer?.cancel();
         setState(() => _polylines = {});
       }
+    } catch (e) {
+      debugPrint('[KZ-P] _advancePhase OUTER catch: $e');
     } finally {
       _isAdvancing = false;
+      debugPrint('[KZ-P] _advancePhase END phase=$_phase');
     }
   }
 
@@ -350,6 +388,8 @@ class _ActiveTripPageState extends State<ActiveTripPage>
                       rating: _clientRating,
                       onRatingChanged: (r) =>
                           setState(() => _clientRating = r),
+                      onCommentChanged: (_) {},
+                      onReportProblem: () {},
                       onFinish: () => context.go('/home'),
                     )
                   : _phase != TripPhase.arrivedAtClient
