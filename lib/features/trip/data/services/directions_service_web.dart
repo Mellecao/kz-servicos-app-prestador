@@ -46,6 +46,7 @@ class DirectionsService {
       final path = routes[0].overviewPath.toDart;
       final points =
           path.map((p) => LatLng(p.lat(), p.lng())).toList();
+      // TODO(web): parse turn-by-turn steps from JS Directions API response
       return RouteResult(polyline: points, steps: const []);
     } catch (_) {
       return RouteResult.empty;
