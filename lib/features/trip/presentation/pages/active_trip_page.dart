@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
@@ -62,6 +63,11 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   bool _isCameraAnimating = false;
   final TripAudioService _tripAudio = TripAudioService();
   String _feedbackComment = '';
+
+  // Rota GPS — pontos completos + progresso do motorista
+  List<LatLng> _fullRoutePoints = [];
+  int _routeProgressIndex = 0;
+  LatLng? _lastRouteFetchLocation;
 
   LatLng get _pickup =>
       LatLng(widget.trip.pickupLat, widget.trip.pickupLng);
@@ -162,6 +168,10 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     _rebuildMarkers();
     _updateCamera();
     _updateCurrentStep();
+    if (_phase.isGpsMode) {
+      _trimRouteToCurrentPosition();
+      unawaited(_maybeRefetchRoute());
+    }
   }
 
   void _updateCurrentStep() {
@@ -192,7 +202,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     _mapController!.animateCamera(
       CameraUpdate.newCameraPosition(CameraPosition(
         target: _currentLocation,
-        zoom: 17.5,
+        zoom: 19,
         tilt: 45,
         bearing: _currentHeading,
       )),
@@ -254,19 +264,16 @@ class _ActiveTripPageState extends State<ActiveTripPage>
       destination: target,
     );
     if (result.polyline.isEmpty || !mounted) return;
+    _fullRoutePoints = result.polyline;
+    _routeProgressIndex = 0;
+    _lastRouteFetchLocation = _currentLocation;
     setState(() {
       _polylines = {
         Polyline(
-          polylineId: const PolylineId('route_glow'),
-          points: result.polyline,
-          color: AppColors.highlight.withValues(alpha: 0.18),
-          width: 10,
-        ),
-        Polyline(
           polylineId: const PolylineId('route'),
-          points: result.polyline,
+          points: _fullRoutePoints,
           color: AppColors.highlight,
-          width: 5,
+          width: 7,
         ),
       };
       _routeSteps = result.steps;
@@ -275,7 +282,49 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     if (result.steps.isNotEmpty) {
       _speakInstruction(result.steps[0].instruction);
     }
-    _pulseAnimator?.start(result.polyline);
+  }
+
+  void _trimRouteToCurrentPosition() {
+    if (_fullRoutePoints.isEmpty) return;
+    final window = math.min(_routeProgressIndex + 50, _fullRoutePoints.length);
+    double minDist = double.infinity;
+    int closestIndex = _routeProgressIndex;
+    for (int i = _routeProgressIndex; i < window; i++) {
+      final d = Geolocator.distanceBetween(
+        _currentLocation.latitude, _currentLocation.longitude,
+        _fullRoutePoints[i].latitude, _fullRoutePoints[i].longitude,
+      );
+      if (d < minDist) {
+        minDist = d;
+        closestIndex = i;
+      }
+    }
+    if (closestIndex > _routeProgressIndex) {
+      _routeProgressIndex = closestIndex;
+    }
+    final remaining = [_currentLocation, ..._fullRoutePoints.sublist(_routeProgressIndex)];
+    setState(() {
+      _polylines = {
+        Polyline(
+          polylineId: const PolylineId('route'),
+          points: remaining,
+          color: AppColors.highlight,
+          width: 7,
+        ),
+      };
+    });
+  }
+
+  Future<void> _maybeRefetchRoute() async {
+    final last = _lastRouteFetchLocation;
+    if (last == null) return;
+    final dist = Geolocator.distanceBetween(
+      _currentLocation.latitude, _currentLocation.longitude,
+      last.latitude, last.longitude,
+    );
+    if (dist > 300) {
+      await _fetchRouteForPhase();
+    }
   }
 
   void _onPulseTick() {
@@ -465,7 +514,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
           GoogleMap(
             initialCameraPosition: CameraPosition(
               target: _pickup,
-              zoom: 17.5,
+              zoom: 19,
               tilt: 45,
             ),
             style: MapStyles.standard,
