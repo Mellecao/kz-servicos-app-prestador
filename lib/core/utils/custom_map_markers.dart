@@ -112,4 +112,39 @@ abstract final class CustomMapMarkers {
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
+
+  static Future<BitmapDescriptor> createNavCarIcon() async {
+    const size = 44.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    // Borda branca
+    canvas.drawCircle(
+      const Offset(size / 2, size / 2),
+      size / 2,
+      Paint()..color = Colors.white,
+    );
+
+    // Círculo azul de fundo
+    canvas.drawCircle(
+      const Offset(size / 2, size / 2),
+      size / 2 - 2,
+      Paint()..color = const Color(0xFF1976D2),
+    );
+
+    // Seta de navegação (chevron apontando para cima)
+    final arrowPath = Path()
+      ..moveTo(size / 2, 7)          // ponta superior
+      ..lineTo(size - 8, size - 7)   // canto inferior direito
+      ..lineTo(size / 2, size - 15)  // entalhe inferior central
+      ..lineTo(8, size - 7)          // canto inferior esquerdo
+      ..close();
+
+    canvas.drawPath(arrowPath, Paint()..color = Colors.white);
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.toInt(), size.toInt());
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
+  }
 }

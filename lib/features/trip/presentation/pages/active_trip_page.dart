@@ -44,7 +44,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
 
   BitmapDescriptor? _yellowPinIcon;
   BitmapDescriptor? _yellowCircleIcon;
-  BitmapDescriptor? _blueTriangleIcon;
+  BitmapDescriptor? _navCarIcon;
 
   bool _showArrivedPopup = false;
   bool _isAdvancing = false;
@@ -79,11 +79,11 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     final results = await Future.wait([
       CustomMapMarkers.createYellowPinIcon(),
       CustomMapMarkers.createYellowCircleIcon(),
-      CustomMapMarkers.createBlueTriangleIcon(),
+      CustomMapMarkers.createNavCarIcon(),
     ]);
     _yellowPinIcon = results[0];
     _yellowCircleIcon = results[1];
-    _blueTriangleIcon = results[2];
+    _navCarIcon = results[2];
     if (!mounted) return;
     _rebuildMarkers();
     _fetchRouteForPhase();
@@ -155,8 +155,8 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     _mapController!.animateCamera(
       CameraUpdate.newCameraPosition(CameraPosition(
         target: _currentLocation,
-        zoom: 17,
-        tilt: 60,
+        zoom: 17.5,
+        tilt: 65,
         bearing: _currentHeading,
       )),
     );
@@ -164,11 +164,11 @@ class _ActiveTripPageState extends State<ActiveTripPage>
 
   void _rebuildMarkers() {
     final markers = <Marker>{};
-    if (_blueTriangleIcon != null) {
+    if (_navCarIcon != null) {
       markers.add(Marker(
         markerId: const MarkerId('driver'),
         position: _currentLocation,
-        icon: _blueTriangleIcon!,
+        icon: _navCarIcon!,
         rotation: _currentHeading,
         anchor: const Offset(0.5, 0.5),
         zIndexInt: 10,
@@ -412,8 +412,8 @@ class _ActiveTripPageState extends State<ActiveTripPage>
           GoogleMap(
             initialCameraPosition: CameraPosition(
               target: _pickup,
-              zoom: 17,
-              tilt: 60,
+              zoom: 17.5,
+              tilt: 65,
             ),
             style: MapStyles.standard,
             onMapCreated: (c) {
