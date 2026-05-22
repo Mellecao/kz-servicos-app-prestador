@@ -364,6 +364,15 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     }
   }
 
+  void _onCall() {
+    final phone = widget.trip.clientPhone;
+    if (phone == null || phone.isEmpty) return;
+    launchUrl(
+      Uri.parse('tel:$phone'),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
   Future<void> _onFinish() async {
     if (_isFinishing) return;
     _isFinishing = true;
@@ -443,6 +452,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
               child: ArrivedAtClientPanel(
                 trip: widget.trip,
                 onStart: _advancePhase,
+                onCall: _onCall,
               ),
             )
           else
@@ -475,7 +485,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
                           buttonLabel: _phase.buttonLabel,
                           onAdvance: _advancePhase,
                           onChat: () => context.push('/chat/0'),
-                          onCall: () {},
+                          onCall: _onCall,
                         )
                       : const SizedBox.shrink(),
             ),

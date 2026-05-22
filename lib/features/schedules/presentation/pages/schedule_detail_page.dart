@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/constants/map_styles.dart';
@@ -407,6 +408,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
       candidateId: '',
       clientName: _trip.clientName,
       clientId: _trip.clientId,
+      clientPhone: _trip.clientPhone,
       pickupAddress: _trip.origin,
       destinationAddress: _trip.destination,
       pickupLat: _trip.originLat,
@@ -423,12 +425,10 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
   }
 
   Widget _buildStartBar() {
+    final phone = _trip.clientPhone;
     return Container(
       padding: EdgeInsets.fromLTRB(
-        24,
-        16,
-        24,
-        MediaQuery.of(context).padding.bottom + 16,
+        24, 16, 24, MediaQuery.of(context).padding.bottom + 16,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -440,33 +440,59 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
           ),
         ],
       ),
-      child: SizedBox(
-        width: double.infinity,
-        height: 52,
-        child: ElevatedButton(
-          onPressed: _isLoading ? null : _startTrip,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2ECC71),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            elevation: 0,
-          ),
-          child: _isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : const Text(
-                  'Iniciar corrida',
-                  style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 15),
+      child: Row(
+        children: [
+          if (phone != null && phone.isNotEmpty) ...[
+            SizedBox(
+              height: 52,
+              width: 52,
+              child: OutlinedButton(
+                onPressed: () => launchUrl(
+                  Uri.parse('tel:$phone'),
+                  mode: LaunchMode.externalApplication,
                 ),
-        ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF2ECC71),
+                  side: const BorderSide(color: Color(0xFF2ECC71), width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: EdgeInsets.zero,
+                ),
+                child: const Icon(Icons.phone_outlined, size: 22),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child: SizedBox(
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _startTrip,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2ECC71),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Iniciar corrida',
+                        style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 15),
+                      ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

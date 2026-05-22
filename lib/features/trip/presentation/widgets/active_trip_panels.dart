@@ -252,11 +252,13 @@ class _TripCompletedPanelState extends State<TripCompletedPanel> {
 class ArrivedAtClientPanel extends StatelessWidget {
   final ActiveTripData trip;
   final VoidCallback onStart;
+  final VoidCallback onCall;
 
   const ArrivedAtClientPanel({
     super.key,
     required this.trip,
     required this.onStart,
+    required this.onCall,
   });
 
   @override
@@ -308,23 +310,48 @@ class ArrivedAtClientPanel extends StatelessWidget {
             label: 'R\$ ${trip.offeredPrice.toStringAsFixed(2)}',
           ),
           const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: onStart,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2ECC71),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+          Row(
+            children: [
+              if (trip.clientPhone != null && trip.clientPhone!.isNotEmpty) ...[
+                SizedBox(
+                  height: 52,
+                  width: 52,
+                  child: OutlinedButton(
+                    onPressed: onCall,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF2ECC71),
+                      side: const BorderSide(color: Color(0xFF2ECC71), width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: const Icon(Icons.phone_outlined, size: 22),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: onStart,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2ECC71),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Iniciar corrida',
+                      style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 16),
+                    ),
+                  ),
                 ),
               ),
-              child: const Text(
-                'Iniciar corrida',
-                style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 16),
-              ),
-            ),
+            ],
           ),
         ],
       ),

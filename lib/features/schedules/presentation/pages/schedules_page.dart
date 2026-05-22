@@ -101,6 +101,7 @@ class _SchedulesPageState extends State<SchedulesPage> {
       candidateId: '',
       clientName: trip.clientName,
       clientId: trip.clientId,
+      clientPhone: trip.clientPhone,
       pickupAddress: trip.origin,
       destinationAddress: trip.destination,
       pickupLat: trip.originLat,

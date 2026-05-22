@@ -3,6 +3,7 @@ class ActiveTripData {
   final String candidateId;
   final String clientName;
   final String? clientId;
+  final String? clientPhone;
   final String pickupAddress;
   final String destinationAddress;
   final double pickupLat;
@@ -19,6 +20,7 @@ class ActiveTripData {
     required this.candidateId,
     required this.clientName,
     this.clientId,
+    this.clientPhone,
     required this.pickupAddress,
     required this.destinationAddress,
     required this.pickupLat,
@@ -61,6 +63,7 @@ class ActiveTripData {
       candidateId: candidateId,
       clientName: clientUser?['full_name'] as String? ?? 'Cliente',
       clientId: trip['client_id'] as String?,
+      clientPhone: clientUser?['phone'] as String?,
       pickupAddress: shortAddress(pickup),
       destinationAddress: shortAddress(dropoff),
       pickupLat: double.parse('${pickup['latitude']}'),
