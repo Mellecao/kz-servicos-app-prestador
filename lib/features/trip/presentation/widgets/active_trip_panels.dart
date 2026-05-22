@@ -306,6 +306,99 @@ class ArrivedAtClientPanel extends StatelessWidget {
   }
 }
 
+class PaymentCollectionPanel extends StatelessWidget {
+  final double price;
+  final String clientName;
+  final String paymentMethodLabel;
+  final VoidCallback onConfirm;
+
+  const PaymentCollectionPanel({
+    super.key,
+    required this.price,
+    required this.clientName,
+    required this.paymentMethodLabel,
+    required this.onConfirm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 24, 20, bottomPadding + 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.check_circle_rounded,
+            color: Color(0xFF2ECC71),
+            size: 48,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Viagem finalizada!',
+            style: TextStyle(
+              fontFamily: 'OutfitBlack',
+              fontSize: 20,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Cobre',
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+          ),
+          Text(
+            'R\$ ${price.toStringAsFixed(2).replaceAll('.', ',')}',
+            style: const TextStyle(
+              fontFamily: 'OutfitBlack',
+              fontSize: 28,
+              color: Color(0xFF2ECC71),
+            ),
+          ),
+          Text(
+            'de $clientName',
+            style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+          ),
+          Text(
+            'pelo $paymentMethodLabel',
+            style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: onConfirm,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2ECC71),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'Pagamento efetuado',
+                style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ArrivedDetailRow extends StatelessWidget {
   final IconData icon;
   final String label;
