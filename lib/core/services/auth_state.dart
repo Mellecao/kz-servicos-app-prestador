@@ -1,3 +1,4 @@
+import 'package:kz_servicos_prestador/core/services/scheduled_trips_service.dart';
 import 'package:kz_servicos_prestador/features/profile/data/models/mock_provider.dart';
 
 class AuthState {
@@ -8,6 +9,7 @@ class AuthState {
   static String? _userEmail;
   static String? _providerProfileId;
   static String? _driverProfileId;
+  static ScheduledTripsService? _scheduledTrips;
 
   static bool get isAuthenticated => _isAuthenticated;
   static ProviderType? get providerType => _providerType;
@@ -16,6 +18,7 @@ class AuthState {
   static String? get userEmail => _userEmail;
   static String? get providerProfileId => _providerProfileId;
   static String? get driverProfileId => _driverProfileId;
+  static ScheduledTripsService? get scheduledTrips => _scheduledTrips;
 
   static void login({
     required ProviderType providerType,
@@ -32,9 +35,16 @@ class AuthState {
     _userEmail = email;
     _providerProfileId = providerProfileId;
     _driverProfileId = driverProfileId;
+
+    if (providerType == ProviderType.driver && driverProfileId != null) {
+      _scheduledTrips?.dispose();
+      _scheduledTrips = ScheduledTripsService(driverProfileId);
+    }
   }
 
   static void logout() {
+    _scheduledTrips?.dispose();
+    _scheduledTrips = null;
     _isAuthenticated = false;
     _providerType = null;
     _userId = null;
