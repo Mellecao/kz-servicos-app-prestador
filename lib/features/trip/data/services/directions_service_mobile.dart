@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:kz_servicos_prestador/features/trip/data/models/route_result.dart';
@@ -34,7 +35,11 @@ class DirectionsService {
     );
 
     try {
-      final response = await _client.get(uri);
+      final response = await _client.get(uri, headers: {
+        'X-Android-Package': 'com.kzservicos.kz_servicos_prestador',
+        'X-Android-Cert': 'c691533385a5bc73b9d778008a0162cec509dce4',
+      });
+      debugPrint('[KZ-DIR] status=${response.statusCode} body=${response.body.substring(0, response.body.length.clamp(0, 400))}');
       if (response.statusCode != 200) return RouteResult.empty;
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
