@@ -10,12 +10,14 @@ import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/constants/map_styles.dart';
 import 'package:kz_servicos_prestador/core/widgets/provider_bottom_nav.dart';
 import 'package:kz_servicos_prestador/features/home/presentation/widgets/online_toggle.dart';
+import 'package:kz_servicos_prestador/features/home/presentation/widgets/scheduled_trips_carousel.dart';
 import 'package:kz_servicos_prestador/features/home/presentation/widgets/trip_request_card.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/driver_service.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
 import 'package:kz_servicos_prestador/features/trip/data/services/directions_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 class HomePage extends StatefulWidget {
   final ValueChanged<int> onNavTap;
@@ -58,6 +60,8 @@ class _HomePageState extends State<HomePage>
   double? _msgIconLeft;
   double? _msgIconTop;
 
+  RealtimeChannel? _invitationsChannel;
+
   TripData get _currentRequest => _requests[_currentRequestIndex];
 
   // Unread messages — driven by real chat later
@@ -68,7 +72,8 @@ class _HomePageState extends State<HomePage>
     super.initState();
     _initLocation();
     _initIcons();
-    _load();
+    _load().then((_) => _subscribeToInvitations());
+    AuthState.scheduledTrips?.addListener(_onScheduledTripsChanged);
   }
 
   Future<void> _load() async {
@@ -101,11 +106,36 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  void _onScheduledTripsChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _stopPulseAnimation();
     _requestTimer?.cancel();
+    _invitationsChannel?.unsubscribe();
+    AuthState.scheduledTrips?.removeListener(_onScheduledTripsChanged);
     super.dispose();
+  }
+
+  void _subscribeToInvitations() {
+    final driverProfileId = AuthState.driverProfileId;
+    if (driverProfileId == null) return;
+    _invitationsChannel = Supabase.instance.client
+        .channel('driver-invitations-$driverProfileId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'trip_driver_candidates',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'driver_profile_id',
+            value: driverProfileId,
+          ),
+          callback: (_) => _load(),
+        )
+        .subscribe();
   }
 
   void _showNextRequest() {
@@ -720,10 +750,25 @@ class _HomePageState extends State<HomePage>
               ),
             ),
 
+          // Carousel de corridas agendadas (só quando não há convite ativo sendo exibido)
+          if ((AuthState.scheduledTrips?.trips.isNotEmpty ?? false) &&
+              !(_showRequest && _requests.isNotEmpty))
+            Positioned(
+              bottom: bottomPadding + 72,
+              left: 0,
+              right: 0,
+              child: ScheduledTripsCarousel(
+                trips: AuthState.scheduledTrips!.trips,
+                onTap: (trip) => context.push('/schedule-detail', extra: trip),
+              ),
+            ),
+
           // My location button
           Positioned(
             right: 16,
-            bottom: bottomPadding + (_isOnline ? 320 : 100),
+            bottom: bottomPadding +
+                ((_showRequest && _requests.isNotEmpty) ? 320 :
+                 (AuthState.scheduledTrips?.trips.isNotEmpty ?? false) ? 260 : 100),
             child: FloatingActionButton.small(
               heroTag: 'myLocation',
               backgroundColor: Colors.white,
@@ -732,10 +777,7 @@ class _HomePageState extends State<HomePage>
                   CameraUpdate.newLatLngZoom(_currentLocation, 15),
                 );
               },
-              child: const Icon(
-                Icons.my_location,
-                color: AppColors.textPrimary,
-              ),
+              child: const Icon(Icons.my_location, color: AppColors.textPrimary),
             ),
           ),
 
