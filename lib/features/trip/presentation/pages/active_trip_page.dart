@@ -104,7 +104,6 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     _navCarIcon = results[2];
     if (!mounted) return;
     _rebuildMarkers();
-    _fetchRouteForPhase();
   }
 
   Future<void> _initLocationTracking() async {
@@ -202,7 +201,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     _mapController!.animateCamera(
       CameraUpdate.newCameraPosition(CameraPosition(
         target: _currentLocation,
-        zoom: 19,
+        zoom: 20,
         tilt: 45,
         bearing: _currentHeading,
       )),
@@ -263,8 +262,12 @@ class _ActiveTripPageState extends State<ActiveTripPage>
       origin: _currentLocation,
       destination: target,
     );
-    if (result.polyline.isEmpty || !mounted) return;
-    _fullRoutePoints = result.polyline;
+    if (!mounted) return;
+    // Usa rota real da API; cai para linha reta se API falhar
+    final routePoints = result.polyline.isNotEmpty
+        ? result.polyline
+        : [_currentLocation, target];
+    _fullRoutePoints = routePoints;
     _routeProgressIndex = 0;
     _lastRouteFetchLocation = _currentLocation;
     setState(() {
@@ -282,6 +285,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     if (result.steps.isNotEmpty) {
       _speakInstruction(result.steps[0].instruction);
     }
+    debugPrint('[KZ-R] rota: ${routePoints.length} pontos (API=${result.polyline.isNotEmpty})');
   }
 
   void _trimRouteToCurrentPosition() {
@@ -514,7 +518,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
           GoogleMap(
             initialCameraPosition: CameraPosition(
               target: _pickup,
-              zoom: 19,
+              zoom: 20,
               tilt: 45,
             ),
             style: MapStyles.standard,
