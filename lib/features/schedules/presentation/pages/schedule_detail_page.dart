@@ -447,10 +447,17 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
               height: 52,
               width: 52,
               child: OutlinedButton(
-                onPressed: () => launchUrl(
-                  Uri.parse('tel:$phone'),
-                  mode: LaunchMode.externalApplication,
-                ),
+                onPressed: () async {
+                  final ok = await launchUrl(
+                    Uri.parse('tel:$phone'),
+                    mode: LaunchMode.externalApplication,
+                  );
+                  if (!ok && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Não foi possível iniciar a ligação.')),
+                    );
+                  }
+                },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF2ECC71),
                   side: const BorderSide(color: Color(0xFF2ECC71), width: 1.5),

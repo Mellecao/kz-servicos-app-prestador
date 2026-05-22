@@ -364,13 +364,18 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     }
   }
 
-  void _onCall() {
+  Future<void> _onCall() async {
     final phone = widget.trip.clientPhone;
     if (phone == null || phone.isEmpty) return;
-    launchUrl(
+    final ok = await launchUrl(
       Uri.parse('tel:$phone'),
       mode: LaunchMode.externalApplication,
     );
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível iniciar a ligação.')),
+      );
+    }
   }
 
   Future<void> _onFinish() async {
