@@ -77,4 +77,51 @@ void main() {
       expect(trip.clientId, isNull);
     });
   });
+
+  group('TripData.fromMap()', () {
+    final map = {
+      'id': 'trip-1',
+      'candidate_id': 'cand-1',
+      'client_id': 'user-xyz',
+      'candidate_status': 'accepted',
+      'client': {'full_name': 'João', 'phone': null},
+      'pickup_address': {
+        'formatted_address': 'Av. Paulista, 1000',
+        'latitude': -23.5505,
+        'longitude': -46.6333,
+      },
+      'dropoff_address': {
+        'formatted_address': 'Aeroporto Congonhas',
+        'latitude': -23.6273,
+        'longitude': -46.6566,
+      },
+      'scheduled_datetime': '2026-05-25T14:30:00.000',
+      'passenger_count': 2,
+      'children_count': 0,
+      'luggage_count': 1,
+      'status': 'searching_drivers',
+    };
+
+    test('parseia client_id corretamente', () {
+      final trip = TripData.fromMap(map);
+      expect(trip.clientId, 'user-xyz');
+    });
+
+    test('parseia candidate_status corretamente', () {
+      final trip = TripData.fromMap(map);
+      expect(trip.candidateStatus, 'accepted');
+    });
+
+    test('clientId é null quando ausente no map', () {
+      final noClientId = Map<String, dynamic>.from(map)..remove('client_id');
+      final trip = TripData.fromMap(noClientId);
+      expect(trip.clientId, isNull);
+    });
+
+    test('candidateStatus é null quando ausente no map', () {
+      final noCandStatus = Map<String, dynamic>.from(map)..remove('candidate_status');
+      final trip = TripData.fromMap(noCandStatus);
+      expect(trip.candidateStatus, isNull);
+    });
+  });
 }
