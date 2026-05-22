@@ -18,6 +18,7 @@ import 'package:kz_servicos_prestador/core/services/driver_service.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
 import 'package:kz_servicos_prestador/features/trip/data/services/directions_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import 'package:kz_servicos_prestador/core/services/trip_audio_service.dart';
 
 class HomePage extends StatefulWidget {
   final ValueChanged<int> onNavTap;
@@ -41,6 +42,7 @@ class _HomePageState extends State<HomePage>
   Set<Polyline> _polylines = {};
   Set<Marker> _markers = {};
   final DirectionsService _directionsService = DirectionsService();
+  final TripAudioService _tripAudio = TripAudioService();
 
   LatLng _currentLocation = const LatLng(-23.5505, -46.6333);
   bool _locationLoaded = false;
@@ -102,7 +104,10 @@ class _HomePageState extends State<HomePage>
         _currentRequestIndex = 0;
         _showRequest = isAvailable;
       });
-      if (isAvailable) _fetchRouteForCurrentRequest();
+      if (isAvailable) {
+        _fetchRouteForCurrentRequest();
+        _tripAudio.playNotificationLoop();
+      }
     }
   }
 
@@ -115,6 +120,8 @@ class _HomePageState extends State<HomePage>
     _stopPulseAnimation();
     _requestTimer?.cancel();
     _invitationsChannel?.unsubscribe();
+    _tripAudio.stopNotification();
+    unawaited(_tripAudio.dispose());
     AuthState.scheduledTrips?.removeListener(_onScheduledTripsChanged);
     super.dispose();
   }
@@ -142,6 +149,7 @@ class _HomePageState extends State<HomePage>
     if (!mounted || !_isOnline || _requests.isEmpty) return;
     setState(() => _showRequest = true);
     _fetchRouteForCurrentRequest();
+    _tripAudio.playNotificationLoop();
   }
 
   Future<void> _initIcons() async {
@@ -200,6 +208,7 @@ class _HomePageState extends State<HomePage>
       _polylines = {};
       _markers = {};
     });
+    _tripAudio.stopNotification();
     _stopPulseAnimation();
     _requestTimer?.cancel();
     final driverProfileId = AuthState.driverProfileId;
@@ -545,6 +554,8 @@ class _HomePageState extends State<HomePage>
   Future<void> _onAccept(double price) async {
     final driverProfileId = AuthState.driverProfileId;
     if (driverProfileId == null) return;
+    _tripAudio.stopNotification();
+    unawaited(_tripAudio.playAccept());
     final request = _requests[_currentRequestIndex];
     final ok = await _tripService.acceptCandidate(
       request.tripId,
@@ -571,6 +582,7 @@ class _HomePageState extends State<HomePage>
   Future<void> _onReject() async {
     final observation = await _showRejectDialog();
     if (observation == null) return; // cancelado
+    _tripAudio.stopNotification();
     final driverProfileId = AuthState.driverProfileId;
     if (driverProfileId == null) return;
     final trip = _requests[_currentRequestIndex];
