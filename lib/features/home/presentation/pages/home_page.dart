@@ -225,8 +225,8 @@ class _HomePageState extends State<HomePage>
       ),
     ]);
 
-    final tripPoints = results[0];
-    final driverToPickupPoints = results[1];
+    final tripPoints = results[0].polyline;
+    final driverToPickupPoints = results[1].polyline;
 
     if (!mounted) return;
 

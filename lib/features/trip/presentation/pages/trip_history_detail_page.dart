@@ -27,10 +27,11 @@ class _TripHistoryDetailPageState extends State<TripHistoryDetailPage> {
 
   Future<void> _fetchRoute() async {
     final t = widget.trip;
-    final points = await _directionsService.fetchRoute(
+    final result = await _directionsService.fetchRoute(
       origin: LatLng(t.originLat, t.originLng),
       destination: LatLng(t.destinationLat, t.destinationLng),
     );
+    final points = result.polyline;
     if (points.isNotEmpty && mounted) {
       setState(() {
         _polylines = {
