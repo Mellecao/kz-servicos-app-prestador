@@ -11,6 +11,7 @@ import 'package:kz_servicos_prestador/core/utils/custom_map_markers.dart';
 import 'package:kz_servicos_prestador/core/utils/route_pulse_animator.dart';
 import 'package:kz_servicos_prestador/core/widgets/circle_button.dart';
 import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
+import 'package:kz_servicos_prestador/features/trip/data/models/route_result.dart';
 import 'package:kz_servicos_prestador/features/trip/data/services/directions_service.dart';
 import 'package:kz_servicos_prestador/features/trip/domain/trip_phase.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/helpers/external_nav_helper.dart';
@@ -34,6 +35,8 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   int _clientRating = 0;
   Set<Polyline> _polylines = {};
   Set<Marker> _markers = {};
+  List<RouteStep> _routeSteps = [];
+  int _currentStepIndex = 0;
   final _directionsService = DirectionsService();
 
   LatLng _currentLocation = const LatLng(-23.5505, -46.6333);
@@ -200,31 +203,37 @@ class _ActiveTripPageState extends State<ActiveTripPage>
       case TripPhase.tripInProgress:
         target = _destination;
       default:
-        setState(() => _polylines = {});
+        setState(() {
+          _polylines = {};
+          _routeSteps = [];
+          _currentStepIndex = 0;
+        });
         return;
     }
-    final points = await _directionsService.fetchRoute(
+    final result = await _directionsService.fetchRoute(
       origin: _currentLocation,
       destination: target,
     );
-    if (points.isEmpty || !mounted) return;
+    if (result.polyline.isEmpty || !mounted) return;
     setState(() {
       _polylines = {
         Polyline(
           polylineId: const PolylineId('route_glow'),
-          points: points,
+          points: result.polyline,
           color: AppColors.highlight.withValues(alpha: 0.18),
           width: 10,
         ),
         Polyline(
           polylineId: const PolylineId('route'),
-          points: points,
+          points: result.polyline,
           color: AppColors.highlight,
           width: 5,
         ),
       };
+      _routeSteps = result.steps;
+      _currentStepIndex = 0;
     });
-    _pulseAnimator?.start(points);
+    _pulseAnimator?.start(result.polyline);
   }
 
   void _onPulseTick() {

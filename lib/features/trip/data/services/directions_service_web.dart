@@ -1,6 +1,7 @@
 import 'dart:js_interop';
 
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:kz_servicos_prestador/features/trip/data/models/route_result.dart';
 import 'package:kz_servicos_prestador/features/trip/data/services/google_maps_js_types.dart';
 
 class DirectionsService {
@@ -8,7 +9,7 @@ class DirectionsService {
 
   DirectionsService({dynamic client});
 
-  Future<List<LatLng>> fetchRoute({
+  Future<RouteResult> fetchRoute({
     required LatLng origin,
     required LatLng destination,
     List<LatLng> waypoints = const [],
@@ -40,12 +41,14 @@ class DirectionsService {
     try {
       final response = await _service.route(request).toDart;
       final routes = response.routes.toDart;
-      if (routes.isEmpty) return [];
+      if (routes.isEmpty) return RouteResult.empty;
 
       final path = routes[0].overviewPath.toDart;
-      return path.map((p) => LatLng(p.lat(), p.lng())).toList();
+      final points =
+          path.map((p) => LatLng(p.lat(), p.lng())).toList();
+      return RouteResult(polyline: points, steps: const []);
     } catch (_) {
-      return [];
+      return RouteResult.empty;
     }
   }
 }
