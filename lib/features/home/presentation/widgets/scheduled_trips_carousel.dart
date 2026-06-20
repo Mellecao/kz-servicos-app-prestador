@@ -57,7 +57,7 @@ class _ScheduledTripsCarouselState extends State<ScheduledTripsCarousel> {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            height: 140,
+            height: 178,
             child: PageView.builder(
               controller: _pageController,
               physics: const BouncingScrollPhysics(),
@@ -118,6 +118,7 @@ class _TripCard extends StatelessWidget {
     if (trip.isAwaitingKzApproval) return const Color(0xFFE65100);
     return switch (trip.status) {
       'awaiting_client_confirmation' => AppColors.secondary,
+      'awaiting_driver_confirmation' => const Color(0xFFF97316),
       'scheduled' => const Color(0xFF27AE60),
       _ => AppColors.textSecondary,
     };
@@ -126,8 +127,10 @@ class _TripCard extends StatelessWidget {
   Color get _statusBg {
     if (trip.isAwaitingKzApproval) return const Color(0xFFFFF3E0);
     return switch (trip.status) {
-      'awaiting_client_confirmation' =>
-        AppColors.secondary.withValues(alpha: 0.1),
+      'awaiting_client_confirmation' => AppColors.secondary.withValues(
+        alpha: 0.1,
+      ),
+      'awaiting_driver_confirmation' => const Color(0xFFFFF3E0),
       'scheduled' => const Color(0xFF27AE60).withValues(alpha: 0.1),
       _ => Colors.grey.shade100,
     };
@@ -142,98 +145,130 @@ class _TripCard extends StatelessWidget {
         '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(13, 12, 13, 8),
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 10),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header: nome + badge de status
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 17,
+                backgroundColor: AppColors.secondary.withValues(alpha: 0.12),
+                backgroundImage:
+                    trip.clientAvatarUrl != null &&
+                        trip.clientAvatarUrl!.isNotEmpty
+                    ? NetworkImage(trip.clientAvatarUrl!)
+                    : null,
+                child:
+                    trip.clientAvatarUrl == null ||
+                        trip.clientAvatarUrl!.isEmpty
+                    ? Text(
+                        trip.clientName.isNotEmpty ? trip.clientName[0] : '?',
+                        style: const TextStyle(
+                          fontFamily: 'OutfitBlack',
+                          fontSize: 14,
+                          color: AppColors.secondary,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  trip.clientName,
+                  style: const TextStyle(
+                    fontFamily: 'OutfitBlack',
+                    fontSize: 16,
+                    color: AppColors.textPrimary,
+                    height: 1.1,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                constraints: const BoxConstraints(maxWidth: 170),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _statusBg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  trip.statusLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: _statusColor,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          // Subtítulo: data · hora · pax  +  preço
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                '$dateStr · $timeStr · ${trip.passengerCount} pax',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'R\$ ${trip.price.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontFamily: 'OutfitBlack',
+                  fontSize: 16,
+                  color: Color(0xFF27AE60),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+          const SizedBox(height: 9),
+          // Rota: origem → destino
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
+              SizedBox(
+                width: 12,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      trip.clientName,
-                      style: const TextStyle(
-                        fontFamily: 'OutfitBlack',
-                        fontSize: 13,
-                        color: AppColors.textPrimary,
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF27AE60),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$dateStr · $timeStr · ${trip.passengerCount} pax',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppColors.textSecondary,
+                    Container(
+                      width: 1.5,
+                      height: 13,
+                      color: Colors.grey.shade300,
+                    ),
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.red.shade400,
                       ),
                     ),
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _statusBg,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      trip.statusLabel,
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: _statusColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'R\$ ${trip.price.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontFamily: 'OutfitBlack',
-                      fontSize: 13,
-                      color: Color(0xFF27AE60),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: const Color(0xFF27AE60), width: 2),
-                    ),
-                  ),
-                  Container(
-                      width: 1.5, height: 14, color: Colors.grey.shade300),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: Colors.red.shade400, width: 2),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 9),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,15 +276,21 @@ class _TripCard extends StatelessWidget {
                     Text(
                       trip.origin,
                       style: const TextStyle(
-                          fontSize: 10, color: AppColors.textPrimary),
+                        fontSize: 12,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 7),
                     Text(
                       trip.destination,
                       style: const TextStyle(
-                          fontSize: 10, color: AppColors.textPrimary),
+                        fontSize: 12,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -259,26 +300,34 @@ class _TripCard extends StatelessWidget {
             ],
           ),
           if (trip.paymentMethod != null || trip.hasLuggage) ...[
+            const SizedBox(height: 8),
+            const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
             const SizedBox(height: 6),
-            const Divider(height: 1, color: Color(0xFFF5F5F5)),
-            const SizedBox(height: 5),
             Row(
               children: [
                 if (trip.paymentMethod != null)
                   Text(
                     '💳 ${trip.paymentMethodLabel}',
                     style: const TextStyle(
-                        fontSize: 9, color: AppColors.textSecondary),
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 if (trip.paymentMethod != null && trip.hasLuggage)
-                  const Text('  ·  ',
-                      style: TextStyle(
-                          fontSize: 9, color: AppColors.textSecondary)),
+                  const Text(
+                    '  ·  ',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 if (trip.hasLuggage)
                   Text(
                     '👜 ${trip.luggageCount} mala${trip.luggageCount > 1 ? 's' : ''}',
                     style: const TextStyle(
-                        fontSize: 9, color: AppColors.textSecondary),
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
               ],
             ),

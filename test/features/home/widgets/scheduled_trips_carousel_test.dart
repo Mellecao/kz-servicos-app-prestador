@@ -3,7 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/features/home/presentation/widgets/scheduled_trips_carousel.dart';
 
-TripData makeTrip(String id, String status, {String? candidateStatus}) => TripData(
+TripData makeTrip(String id, String status, {String? candidateStatus}) =>
+    TripData(
       tripId: id,
       candidateId: '',
       clientName: 'João Silva',
@@ -27,10 +28,7 @@ Widget buildCarousel(List<TripData> trips, {void Function(TripData)? onTap}) {
     home: Scaffold(
       body: Stack(
         children: [
-          ScheduledTripsCarousel(
-            trips: trips,
-            onTap: onTap ?? (_) {},
-          ),
+          ScheduledTripsCarousel(trips: trips, onTap: onTap ?? (_) {}),
         ],
       ),
     ),
@@ -44,18 +42,33 @@ void main() {
       expect(find.text('João Silva'), findsOneWidget);
     });
 
-    testWidgets('exibe badge "Aguardando aprovação da KZ" quando candidateStatus=accepted', (tester) async {
-      await tester.pumpWidget(buildCarousel([
-        makeTrip('1', 'searching_drivers', candidateStatus: 'accepted'),
-      ]));
-      expect(find.text('Aguardando aprovação da KZ'), findsOneWidget);
+    testWidgets(
+      'exibe badge "Aguardando aprovação da KZ" quando candidateStatus=accepted',
+      (tester) async {
+        await tester.pumpWidget(
+          buildCarousel([
+            makeTrip('1', 'searching_drivers', candidateStatus: 'accepted'),
+          ]),
+        );
+        expect(find.text('Aguardando aprovação da KZ'), findsOneWidget);
+      },
+    );
+
+    testWidgets('exibe badge de re-check quando passageiro aprovou', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildCarousel([makeTrip('1', 'awaiting_driver_confirmation')]),
+      );
+      expect(find.text('Aguardando re-check do motorista'), findsOneWidget);
     });
 
-    testWidgets('exibe dots de paginação quando há mais de uma corrida', (tester) async {
-      await tester.pumpWidget(buildCarousel([
-        makeTrip('1', 'scheduled'),
-        makeTrip('2', 'scheduled'),
-      ]));
+    testWidgets('exibe dots de paginação quando há mais de uma corrida', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildCarousel([makeTrip('1', 'scheduled'), makeTrip('2', 'scheduled')]),
+      );
       // Dots container deve aparecer
       expect(find.byType(AnimatedContainer), findsWidgets);
     });

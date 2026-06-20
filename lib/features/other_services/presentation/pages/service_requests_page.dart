@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/constants/category_colors.dart';
 import 'package:kz_servicos_prestador/core/models/service_request_data.dart';
@@ -41,15 +42,12 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
 
   List<ServiceRequestData> get _filteredRequests {
     final providerId = AuthState.providerProfileId;
-    final visible =
-        _requests.where((r) => !_hiddenIds.contains(r.id)).toList();
+    final visible = _requests.where((r) => !_hiddenIds.contains(r.id)).toList();
     if (_filter == 'Pendentes') {
       return visible.where((r) => r.providerProfileId == null).toList();
     }
     if (_filter == 'Aceitos') {
-      return visible
-          .where((r) => r.providerProfileId == providerId)
-          .toList();
+      return visible.where((r) => r.providerProfileId == providerId).toList();
     }
     return visible;
   }
@@ -60,9 +58,7 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          ok ? 'Solicitação aceita' : 'Não foi possível aceitar',
-        ),
+        content: Text(ok ? 'Solicitação aceita' : 'Não foi possível aceitar'),
       ),
     );
     if (ok) await _load();
@@ -70,9 +66,9 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
 
   void _onReject(ServiceRequestData request) {
     setState(() => _hiddenIds.add(request.id));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Solicitação recusada')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Solicitação recusada')));
   }
 
   @override
@@ -101,6 +97,8 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
+                      _buildHomeBanner(context),
+                      const SizedBox(height: 16),
                       _buildFilterChips(),
                     ],
                   ),
@@ -119,7 +117,7 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
                                     SizedBox(
                                       height:
                                           MediaQuery.of(context).size.height *
-                                              0.5,
+                                          0.5,
                                       child: _buildEmptyState(),
                                     ),
                                   ],
@@ -128,7 +126,11 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
                                   physics:
                                       const AlwaysScrollableScrollPhysics(),
                                   padding: EdgeInsets.fromLTRB(
-                                      24, 0, 24, bottomPad + 100),
+                                    24,
+                                    0,
+                                    24,
+                                    bottomPad + 100,
+                                  ),
                                   itemCount: _filteredRequests.length,
                                   itemBuilder: (_, i) => _RequestCard(
                                     request: _filteredRequests[i],
@@ -167,8 +169,7 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
           child: GestureDetector(
             onTap: () => setState(() => _filter = f),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 color: isActive ? AppColors.highlight : Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -188,6 +189,33 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  double _homeBannerHeight(BuildContext context) {
+    final width = MediaQuery.of(context).size.width - 48;
+    return (width / 3.19).clamp(88.0, 118.0);
+  }
+
+  Widget _buildHomeBanner(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => context.push('/benefits'),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            height: _homeBannerHeight(context),
+            width: double.infinity,
+            child: Image.asset(
+              'assets/images/banner.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -259,7 +287,9 @@ class _RequestCard extends StatelessWidget {
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: categoryColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
@@ -289,8 +319,11 @@ class _RequestCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.location_on_outlined,
-                  size: 16, color: AppColors.textSecondary),
+              const Icon(
+                Icons.location_on_outlined,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
@@ -308,8 +341,11 @@ class _RequestCard extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              const Icon(Icons.calendar_today_outlined,
-                  size: 16, color: AppColors.textSecondary),
+              const Icon(
+                Icons.calendar_today_outlined,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 4),
               Text(
                 _formattedDate,
@@ -346,10 +382,7 @@ class _RequestCard extends StatelessWidget {
                     ),
                     child: const Text(
                       'Recusar',
-                      style: TextStyle(
-                        fontFamily: 'OutfitBlack',
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 13),
                     ),
                   ),
                 ),
@@ -367,10 +400,7 @@ class _RequestCard extends StatelessWidget {
                     ),
                     child: const Text(
                       'Aceitar',
-                      style: TextStyle(
-                        fontFamily: 'OutfitBlack',
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 13),
                     ),
                   ),
                 ),
@@ -379,8 +409,7 @@ class _RequestCard extends StatelessWidget {
           ] else ...[
             const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: const Color(0xFF2ECC71).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),

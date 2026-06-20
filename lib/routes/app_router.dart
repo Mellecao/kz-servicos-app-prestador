@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
+import 'package:kz_servicos_prestador/core/services/auth_service.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
+import 'package:kz_servicos_prestador/core/services/trip_service.dart';
+import 'package:kz_servicos_prestador/core/widgets/circle_button.dart';
 import 'package:kz_servicos_prestador/features/auth/presentation/pages/login_page.dart';
+import 'package:kz_servicos_prestador/features/benefits/presentation/pages/benefits_page.dart';
 import 'package:kz_servicos_prestador/core/services/trip_chat_service.dart';
 import 'package:kz_servicos_prestador/features/chat/presentation/pages/chat_page.dart';
 import 'package:kz_servicos_prestador/features/chat/presentation/pages/messages_page.dart';
@@ -16,6 +20,7 @@ import 'package:kz_servicos_prestador/features/profile/presentation/pages/profil
 import 'package:kz_servicos_prestador/features/profile/presentation/pages/security_settings_page.dart';
 import 'package:kz_servicos_prestador/features/splash/presentation/pages/splash_page.dart';
 import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
+import 'package:kz_servicos_prestador/features/trip/presentation/pages/active_trip_loader_page.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/pages/active_trip_page.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/pages/trip_history_detail_page.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/pages/trip_history_page.dart';
@@ -33,17 +38,19 @@ class AppRouter {
       GoRoute(
         path: '/splash',
         builder: (context, state) => SplashPage(
-          onFinished: () => context.go('/login'),
+          redirectLocation: state.uri.queryParameters['redirect'],
+          onFinished: (location) => context.go(location),
         ),
       ),
       GoRoute(
         path: '/login',
         builder: (context, state) => LoginPage(
-          onLoginSuccess: (type) {
+          onLoginSuccess: (type) async {
             if (type == ProviderType.serviceProvider) {
               context.go('/provider-home');
             } else {
-              context.go('/home');
+              final location = await _driverStartLocation();
+              if (context.mounted) context.go(location);
             }
           },
         ),
@@ -51,31 +58,45 @@ class AppRouter {
       // Driver routes
       GoRoute(
         path: '/home',
-        builder: (context, state) => HomePage(
-          onNavTap: (i) => _handleNavTap(context, i),
-        ),
+        builder: (context, state) =>
+            HomePage(onNavTap: (i) => _handleNavTap(context, state, i)),
       ),
       GoRoute(
         path: '/trip-history',
-        builder: (context, state) => const TripHistoryPage(),
+        builder: (context, state) =>
+            _withActiveTripBack(context, state, const TripHistoryPage()),
       ),
       GoRoute(
         path: '/earnings',
-        builder: (context, state) => EarningsPage(
-          onNavTap: (i) => _handleNavTap(context, i),
+        builder: (context, state) => _withActiveTripBack(
+          context,
+          state,
+          EarningsPage(onNavTap: (i) => _handleNavTap(context, state, i)),
         ),
       ),
       GoRoute(
         path: '/profile',
-        builder: (context, state) => ProfilePage(
-          onNavTap: (i) => _handleNavTap(context, i),
+        builder: (context, state) => _withActiveTripBack(
+          context,
+          state,
+          ProfilePage(onNavTap: (i) => _handleNavTap(context, state, i)),
         ),
+      ),
+      GoRoute(
+        path: '/benefits',
+        builder: (context, state) =>
+            _withActiveTripBack(context, state, const BenefitsPage()),
       ),
       GoRoute(
         path: '/active-trip',
         builder: (context, state) {
-          final trip = state.extra as ActiveTripData;
-          return ActiveTripPage(trip: trip);
+          final trip = state.extra is ActiveTripData
+              ? state.extra as ActiveTripData
+              : null;
+          if (trip != null) return ActiveTripPage(trip: trip);
+          return ActiveTripLoaderPage(
+            tripId: state.uri.queryParameters['tripId'],
+          );
         },
       ),
       GoRoute(
@@ -87,7 +108,8 @@ class AppRouter {
       ),
       GoRoute(
         path: '/messages',
-        builder: (context, state) => const MessagesPage(),
+        builder: (context, state) =>
+            _withActiveTripBack(context, state, const MessagesPage()),
       ),
       GoRoute(
         path: '/chat/:roomId',
@@ -102,8 +124,10 @@ class AppRouter {
       ),
       GoRoute(
         path: '/schedules',
-        builder: (context, state) => SchedulesPage(
-          onNavTap: (i) => _handleNavTap(context, i),
+        builder: (context, state) => _withActiveTripBack(
+          context,
+          state,
+          SchedulesPage(onNavTap: (i) => _handleNavTap(context, state, i)),
         ),
       ),
       GoRoute(
@@ -140,22 +164,95 @@ class AppRouter {
     final path = state.uri.path;
     final publicRoutes = ['/splash', '/login'];
     if (publicRoutes.contains(path)) return null;
-    if (!AuthState.isAuthenticated) return '/login';
+    if (!AuthState.isAuthenticated) {
+      final redirect = Uri.encodeComponent(state.uri.toString());
+      return '/splash?redirect=$redirect';
+    }
+    final activeTripRedirect = activeTripHomeRedirect(state.uri);
+    if (activeTripRedirect != null) return activeTripRedirect;
     return null;
   }
 
-  static void _handleNavTap(BuildContext context, int index) {
+  static String? activeTripHomeRedirect(Uri uri) {
+    if (uri.path != '/home') return null;
+
+    final activeTripId = uri.queryParameters['returnToActiveTripId'];
+    if (activeTripId == null || activeTripId.isEmpty) return null;
+
+    return '/active-trip?tripId=${Uri.encodeComponent(activeTripId)}';
+  }
+
+  static void _handleNavTap(
+    BuildContext context,
+    GoRouterState state,
+    int index,
+  ) {
     final routes = ['/home', '/schedules', '/earnings', '/profile'];
-    context.go(routes[index]);
+    final activeTripId = state.uri.queryParameters['returnToActiveTripId'];
+    if (activeTripId == null) {
+      context.go(routes[index]);
+      return;
+    }
+    context.pushReplacement(
+      '${routes[index]}?returnToActiveTripId=${Uri.encodeComponent(activeTripId)}',
+    );
+  }
+
+  static Widget _withActiveTripBack(
+    BuildContext context,
+    GoRouterState state,
+    Widget child,
+  ) {
+    final activeTripId = state.uri.queryParameters['returnToActiveTripId'];
+    if (activeTripId == null) return child;
+
+    return Stack(
+      children: [
+        child,
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 8,
+          right: 16,
+          child: CircleButton(
+            icon: Icons.arrow_back,
+            onTap: () {
+              if (context.canPop()) {
+                context.pop();
+                return;
+              }
+              context.go(
+                '/active-trip?tripId=${Uri.encodeComponent(activeTripId)}',
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   static void _handleProviderNavTap(BuildContext context, int index) {
-    const routes = ['/provider-home', '/provider-earnings', '/provider-profile'];
+    const routes = [
+      '/provider-home',
+      '/provider-earnings',
+      '/provider-profile',
+    ];
     context.go(routes[index]);
   }
 
-  static void logout(BuildContext context) {
+  static Future<String> _driverStartLocation() async {
+    final driverProfileId = AuthState.driverProfileId;
+    if (driverProfileId == null) return '/home';
+
+    final activeTrip = await TripService().getCurrentActiveTrip(
+      driverProfileId,
+    );
+    if (activeTrip == null) return '/home';
+
+    return '/active-trip?tripId=${Uri.encodeComponent(activeTrip.id)}';
+  }
+
+  static Future<void> logout(BuildContext context) async {
     AuthState.logout();
-    context.go('/login');
+    await AuthService().logout();
+    if (context.mounted) context.go('/login');
   }
 }

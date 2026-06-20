@@ -51,7 +51,10 @@ class _MessagesPageState extends State<MessagesPage>
     if (AuthState.isDriver && driverProfileId != null) {
       entries = await _chatService.getChatsForDriver(driverProfileId, userId);
     } else if (providerProfileId != null) {
-      entries = await _chatService.getChatsForServiceProvider(providerProfileId, userId);
+      entries = await _chatService.getChatsForServiceProvider(
+        providerProfileId,
+        userId,
+      );
     } else {
       entries = [];
     }
@@ -101,6 +104,7 @@ class _MessagesPageState extends State<MessagesPage>
           title: entry.title,
           subtitle: entry.subtitle,
           clientName: entry.clientName,
+          clientAvatarUrl: entry.clientAvatarUrl,
           clientId: entry.clientId,
           tripId: entry.isTrip ? entry.referenceId : null,
           serviceRequestId: entry.isTrip ? null : entry.referenceId,
@@ -140,8 +144,11 @@ class _MessagesPageState extends State<MessagesPage>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.chat_bubble_outline,
-                      size: 64, color: AppColors.textSecondary),
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    size: 64,
+                    color: AppColors.textSecondary,
+                  ),
                   SizedBox(height: 16),
                   Text(
                     'Nenhuma mensagem',
@@ -229,14 +236,23 @@ class _ConversationTile extends StatelessWidget {
             CircleAvatar(
               radius: 24,
               backgroundColor: AppColors.secondary.withValues(alpha: 0.1),
-              child: Text(
-                entry.clientName.isNotEmpty ? entry.clientName[0] : '?',
-                style: const TextStyle(
-                  fontFamily: 'OutfitBlack',
-                  fontSize: 18,
-                  color: AppColors.secondary,
-                ),
-              ),
+              backgroundImage:
+                  entry.clientAvatarUrl != null &&
+                      entry.clientAvatarUrl!.isNotEmpty
+                  ? NetworkImage(entry.clientAvatarUrl!)
+                  : null,
+              child:
+                  entry.clientAvatarUrl == null ||
+                      entry.clientAvatarUrl!.isEmpty
+                  ? Text(
+                      entry.clientName.isNotEmpty ? entry.clientName[0] : '?',
+                      style: const TextStyle(
+                        fontFamily: 'OutfitBlack',
+                        fontSize: 18,
+                        color: AppColors.secondary,
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -256,7 +272,9 @@ class _ConversationTile extends StatelessWidget {
                     Text(
                       entry.subtitle,
                       style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary),
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -270,8 +288,9 @@ class _ConversationTile extends StatelessWidget {
                         color: hasUnread
                             ? AppColors.textPrimary
                             : AppColors.textSecondary,
-                        fontWeight:
-                            hasUnread ? FontWeight.w700 : FontWeight.normal,
+                        fontWeight: hasUnread
+                            ? FontWeight.w700
+                            : FontWeight.normal,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

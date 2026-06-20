@@ -25,7 +25,12 @@ class _SchedulesPageState extends State<SchedulesPage> {
   String _activeFilter = 'Todos';
   RealtimeChannel? _tripsChannel;
 
-  static const _filters = ['Todos', 'Agendado', 'Aguardando aprovação'];
+  static const _filters = [
+    'Todos',
+    'Agendado',
+    'Aguardando re-check',
+    'Aguardando aprovação',
+  ];
 
   @override
   void initState() {
@@ -53,7 +58,17 @@ class _SchedulesPageState extends State<SchedulesPage> {
             column: 'driver_profile_id',
             value: driverProfileId,
           ),
-          callback: (_) => _load(),
+          callback: (payload) {
+            if (payload.newRecord['status'] == 'rejected' &&
+                (payload.newRecord['observations'] as String?)?.contains(
+                      'cancelada',
+                    ) ==
+                    true) {
+              _handleRemoteCancellation();
+              return;
+            }
+            _load();
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
@@ -64,9 +79,23 @@ class _SchedulesPageState extends State<SchedulesPage> {
             column: 'driver_profile_id',
             value: driverProfileId,
           ),
-          callback: (_) => _load(),
+          callback: (payload) {
+            if (payload.newRecord['status'] == 'cancelled') {
+              _handleRemoteCancellation();
+              return;
+            }
+            _load();
+          },
         )
         .subscribe();
+  }
+
+  void _handleRemoteCancellation() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Uma corrida foi cancelada pela KZ.')),
+    );
+    context.go('/home');
   }
 
   Future<void> _load() async {
@@ -102,6 +131,7 @@ class _SchedulesPageState extends State<SchedulesPage> {
       clientName: trip.clientName,
       clientId: trip.clientId,
       clientPhone: trip.clientPhone,
+      clientAvatarUrl: trip.clientAvatarUrl,
       pickupAddress: trip.origin,
       destinationAddress: trip.destination,
       pickupLat: trip.originLat,
@@ -112,8 +142,12 @@ class _SchedulesPageState extends State<SchedulesPage> {
       offeredPrice: trip.price,
       paymentMethod: trip.paymentMethod,
       scheduledAt: trip.scheduledAt,
+      status: 'started',
     );
-    context.push('/active-trip', extra: activeTripData);
+    context.go(
+      '/active-trip?tripId=${Uri.encodeComponent(trip.tripId)}',
+      extra: activeTripData,
+    );
   }
 
   List<TripData> get _filtered {
@@ -123,7 +157,12 @@ class _SchedulesPageState extends State<SchedulesPage> {
       ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
 
     return switch (_activeFilter) {
-      'Agendado' => scheduled,
+      'Agendado' =>
+        scheduled.where((trip) => trip.status == 'scheduled').toList(),
+      'Aguardando re-check' =>
+        scheduled
+            .where((trip) => trip.status == 'awaiting_driver_confirmation')
+            .toList(),
       'Aguardando aprovação' => invitations,
       _ => [...scheduled, ...invitations],
     };
@@ -160,40 +199,44 @@ class _SchedulesPageState extends State<SchedulesPage> {
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
                       : items.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'Nenhum agendamento encontrado',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 15,
-                                ),
+                      ? const Center(
+                          child: Text(
+                            'Nenhum agendamento encontrado',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 15,
+                            ),
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          child: ListView.separated(
+                            padding: EdgeInsets.fromLTRB(
+                              24,
+                              0,
+                              24,
+                              bottomPadding + 100,
+                            ),
+                            itemCount: items.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (_, i) => GestureDetector(
+                              onTap: () => context.push(
+                                '/schedule-detail',
+                                extra: items[i],
                               ),
-                            )
-                          : RefreshIndicator(
-                              onRefresh: _load,
-                              child: ListView.separated(
-                                padding: EdgeInsets.fromLTRB(
-                                    24, 0, 24, bottomPadding + 100),
-                                itemCount: items.length,
-                                separatorBuilder: (_, _) =>
-                                    const SizedBox(height: 10),
-                                itemBuilder: (_, i) => GestureDetector(
-                                  onTap: () => context.push(
-                                    '/schedule-detail',
-                                    extra: items[i],
-                                  ),
-                                  child: _ScheduleCard(
-                                    trip: items[i],
-                                    isHighlighted: items[i].status ==
-                                            'scheduled' &&
-                                        _activeFilter == 'Todos',
-                                    onStartTrip: items[i].status == 'scheduled'
-                                        ? () => _startTrip(items[i])
-                                        : null,
-                                  ),
-                                ),
+                              child: _ScheduleCard(
+                                trip: items[i],
+                                isHighlighted:
+                                    items[i].status == 'scheduled' &&
+                                    _activeFilter == 'Todos',
+                                onStartTrip: items[i].status == 'scheduled'
+                                    ? () => _startTrip(items[i])
+                                    : null,
                               ),
                             ),
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -224,13 +267,16 @@ class _SchedulesPageState extends State<SchedulesPage> {
             child: GestureDetector(
               onTap: () => setState(() => _activeFilter = f),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: isActive ? AppColors.highlight : Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  border:
-                      isActive ? null : Border.all(color: Colors.grey.shade300),
+                  border: isActive
+                      ? null
+                      : Border.all(color: Colors.grey.shade300),
                 ),
                 child: Text(
                   f,
@@ -264,7 +310,7 @@ class _ScheduleCard extends StatelessWidget {
     if (trip.isAwaitingKzApproval) return const Color(0xFFE65100);
     return switch (trip.status) {
       'awaiting_client_confirmation' => AppColors.secondary,
-      'awaiting_driver_confirmation' => AppColors.secondary,
+      'awaiting_driver_confirmation' => const Color(0xFFF97316),
       'searching_drivers' => AppColors.secondary,
       'scheduled' => const Color(0xFF2ECC71),
       _ => AppColors.textSecondary,
@@ -285,9 +331,7 @@ class _ScheduleCard extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-            ),
+            decoration: const BoxDecoration(color: Colors.white),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -304,8 +348,11 @@ class _ScheduleCard extends StatelessWidget {
                       ),
                     ),
                     Container(
+                      constraints: const BoxConstraints(maxWidth: 170),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: _statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
@@ -317,6 +364,8 @@ class _ScheduleCard extends StatelessWidget {
                           fontSize: 10,
                           color: _statusColor,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -326,19 +375,33 @@ class _ScheduleCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today,
-                        size: 14, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.calendar_today,
+                      size: 14,
+                      color: Colors.grey.shade400,
+                    ),
                     const SizedBox(width: 6),
-                    Text(dateStr,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
+                    Text(
+                      dateStr,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                     const SizedBox(width: 16),
-                    Icon(Icons.access_time,
-                        size: 14, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.access_time,
+                      size: 14,
+                      color: Colors.grey.shade400,
+                    ),
                     const SizedBox(width: 6),
-                    Text(timeStr,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
+                    Text(
+                      timeStr,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                     const Spacer(),
                     Text(
                       'R\$ ${trip.price.toStringAsFixed(2)}',
@@ -385,10 +448,7 @@ class _ScheduleCard extends StatelessWidget {
               left: 0,
               top: 0,
               bottom: 0,
-              child: Container(
-                width: 4,
-                color: const Color(0xFF2ECC71),
-              ),
+              child: Container(width: 4, color: const Color(0xFF2ECC71)),
             ),
         ],
       ),
@@ -431,17 +491,25 @@ class _RouteLine extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(origin,
-                  style: const TextStyle(
-                      fontSize: 13, color: AppColors.textPrimary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                origin,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               const SizedBox(height: 8),
-              Text(destination,
-                  style: const TextStyle(
-                      fontSize: 13, color: AppColors.textPrimary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                destination,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),

@@ -19,8 +19,29 @@ class RouteStep {
 class RouteResult {
   final List<LatLng> polyline;
   final List<RouteStep> steps;
+  final String distanceText;
+  final double distanceMeters;
+  final String durationText;
+  final int durationSeconds;
 
-  const RouteResult({required this.polyline, required this.steps});
+  const RouteResult({
+    required this.polyline,
+    required this.steps,
+    this.distanceText = '',
+    this.distanceMeters = 0,
+    this.durationText = '',
+    this.durationSeconds = 0,
+  });
 
   static const empty = RouteResult(polyline: [], steps: []);
+}
+
+abstract final class RouteRenderingPoints {
+  static List<LatLng> fromResult(
+    LatLng origin,
+    LatLng destination, {
+    required List<LatLng> resultPolyline,
+  }) {
+    return resultPolyline;
+  }
 }

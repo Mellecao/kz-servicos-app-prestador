@@ -28,19 +28,36 @@ TripData makeTrip({
 
 void main() {
   group('TripData.statusLabel', () {
-    test('searching_drivers com candidateStatus=accepted mostra "Aguardando aprovação da KZ"', () {
-      final trip = makeTrip(status: 'searching_drivers', candidateStatus: 'accepted');
-      expect(trip.statusLabel, 'Aguardando aprovação da KZ');
-    });
+    test(
+      'searching_drivers com candidateStatus=accepted mostra "Aguardando aprovação da KZ"',
+      () {
+        final trip = makeTrip(
+          status: 'searching_drivers',
+          candidateStatus: 'accepted',
+        );
+        expect(trip.statusLabel, 'Aguardando aprovação da KZ');
+      },
+    );
 
-    test('searching_drivers sem candidateStatus mantém "Buscando motoristas"', () {
-      final trip = makeTrip(status: 'searching_drivers');
-      expect(trip.statusLabel, 'Buscando motoristas');
-    });
+    test(
+      'searching_drivers sem candidateStatus mantém "Buscando motoristas"',
+      () {
+        final trip = makeTrip(status: 'searching_drivers');
+        expect(trip.statusLabel, 'Buscando motoristas');
+      },
+    );
 
-    test('awaiting_client_confirmation mostra "Aguardando passageiro aceitar"', () {
-      final trip = makeTrip(status: 'awaiting_client_confirmation');
-      expect(trip.statusLabel, 'Aguardando passageiro aceitar');
+    test(
+      'awaiting_client_confirmation mostra "Aguardando passageiro aceitar"',
+      () {
+        final trip = makeTrip(status: 'awaiting_client_confirmation');
+        expect(trip.statusLabel, 'Aguardando passageiro aceitar');
+      },
+    );
+
+    test('awaiting_driver_confirmation mostra re-check do motorista', () {
+      final trip = makeTrip(status: 'awaiting_driver_confirmation');
+      expect(trip.statusLabel, 'Aguardando re-check do motorista');
     });
 
     test('scheduled mostra "Agendada"', () {
@@ -51,7 +68,10 @@ void main() {
 
   group('TripData.isAwaitingKzApproval', () {
     test('true quando searching_drivers + candidateStatus=accepted', () {
-      final trip = makeTrip(status: 'searching_drivers', candidateStatus: 'accepted');
+      final trip = makeTrip(
+        status: 'searching_drivers',
+        candidateStatus: 'accepted',
+      );
       expect(trip.isAwaitingKzApproval, isTrue);
     });
 
@@ -119,7 +139,8 @@ void main() {
     });
 
     test('candidateStatus é null quando ausente no map', () {
-      final noCandStatus = Map<String, dynamic>.from(map)..remove('candidate_status');
+      final noCandStatus = Map<String, dynamic>.from(map)
+        ..remove('candidate_status');
       final trip = TripData.fromMap(noCandStatus);
       expect(trip.candidateStatus, isNull);
     });

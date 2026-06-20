@@ -6,7 +6,7 @@ import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 
 class TripRequestCard extends StatefulWidget {
   final TripData request;
-  final void Function(double price) onAccept;
+  final void Function(double? price) onAccept;
   final VoidCallback onReject;
 
   const TripRequestCard({
@@ -30,6 +30,7 @@ class _TripRequestCardState extends State<TripRequestCard>
   @override
   void initState() {
     super.initState();
+    _syncKzPrice();
     _shakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -40,6 +41,22 @@ class _TripRequestCardState extends State<TripRequestCard>
   }
 
   @override
+  void didUpdateWidget(covariant TripRequestCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.request.kzProposedPrice != widget.request.kzProposedPrice ||
+        oldWidget.request.kzProposalLocked != widget.request.kzProposalLocked) {
+      _syncKzPrice();
+    }
+  }
+
+  void _syncKzPrice() {
+    final kzPrice = widget.request.kzProposedPrice;
+    if (widget.request.kzProposalLocked && kzPrice != null) {
+      _priceController.text = kzPrice.toStringAsFixed(2).replaceAll('.', ',');
+    }
+  }
+
+  @override
   void dispose() {
     _priceController.dispose();
     _shakeController.dispose();
@@ -47,6 +64,17 @@ class _TripRequestCardState extends State<TripRequestCard>
   }
 
   void _handleAccept() {
+    if (widget.request.status == 'awaiting_driver_confirmation') {
+      widget.onAccept(null);
+      return;
+    }
+
+    if (widget.request.kzProposalLocked &&
+        widget.request.kzProposedPrice != null) {
+      widget.onAccept(widget.request.kzProposedPrice);
+      return;
+    }
+
     final text = _priceController.text.trim().replaceAll(',', '.');
     final price = double.tryParse(text);
     if (price == null || price <= 0) {
@@ -60,6 +88,18 @@ class _TripRequestCardState extends State<TripRequestCard>
 
   @override
   Widget build(BuildContext context) {
+    final hasRejectedPrice =
+        widget.request.priceRejectionReason != null &&
+        widget.request.priceRejectionReason!.isNotEmpty;
+    final hasKzProposal =
+        widget.request.kzProposalLocked &&
+        widget.request.kzProposedPrice != null;
+    final inputBorderColor = hasKzProposal
+        ? const Color(0xFF16A34A)
+        : hasRejectedPrice || _showError
+        ? Colors.red.shade400
+        : Colors.grey.shade200;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -83,14 +123,25 @@ class _TripRequestCardState extends State<TripRequestCard>
               CircleAvatar(
                 radius: 20,
                 backgroundColor: AppColors.highlight.withValues(alpha: 0.15),
-                child: Text(
-                  widget.request.clientName[0],
-                  style: const TextStyle(
-                    fontFamily: 'OutfitBlack',
-                    fontSize: 18,
-                    color: AppColors.highlight,
-                  ),
-                ),
+                backgroundImage:
+                    widget.request.clientAvatarUrl != null &&
+                        widget.request.clientAvatarUrl!.isNotEmpty
+                    ? NetworkImage(widget.request.clientAvatarUrl!)
+                    : null,
+                child:
+                    widget.request.clientAvatarUrl == null ||
+                        widget.request.clientAvatarUrl!.isEmpty
+                    ? Text(
+                        widget.request.clientName.isNotEmpty
+                            ? widget.request.clientName[0]
+                            : '?',
+                        style: const TextStyle(
+                          fontFamily: 'OutfitBlack',
+                          fontSize: 18,
+                          color: AppColors.highlight,
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -119,6 +170,45 @@ class _TripRequestCardState extends State<TripRequestCard>
             isCircle: true,
           ),
 
+          if (widget.request.isRoundTrip) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.highlight.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.highlight.withValues(alpha: 0.28),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.sync_alt_rounded,
+                    size: 18,
+                    color: AppColors.highlight,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.request.returnAt == null
+                          ? 'Corrida ida e volta'
+                          : 'Corrida ida e volta • retorno ${_formatShortDateTime(widget.request.returnAt!)}',
+                      style: const TextStyle(
+                        fontFamily: 'QuasimodoSemiBold',
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // Extra info chips
           if (widget.request.hasChildren || widget.request.hasLuggage) ...[
             const SizedBox(height: 12),
@@ -138,82 +228,153 @@ class _TripRequestCardState extends State<TripRequestCard>
 
           const SizedBox(height: 16),
 
-          // Price input with shake animation
-          AnimatedBuilder(
-            animation: _shakeAnimation,
-            builder: (_, child) {
-              final offset = _shakeController.isAnimating
-                  ? math.sin(_shakeAnimation.value * math.pi * 6) * 6
-                  : 0.0;
-              return Transform.translate(
-                offset: Offset(offset, 0),
-                child: child,
-              );
-            },
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Seu valor para esta corrida:',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
+          if (widget.request.status == 'awaiting_driver_confirmation') ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFF97316).withValues(alpha: 0.25),
                 ),
-                const SizedBox(height: 6),
-                TextField(
-                  key: const Key('price_input'),
-                  controller: _priceController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                  ],
-                  onChanged: (_) {
-                    if (_showError) setState(() => _showError = false);
-                  },
-                  decoration: InputDecoration(
-                    prefixText: 'R\$  ',
-                    hintText: '0,00',
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: _showError
-                            ? Colors.red.shade400
-                            : Colors.grey.shade200,
-                        width: _showError ? 1.5 : 1,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: _showError
-                            ? Colors.red.shade400
-                            : AppColors.highlight,
-                        width: 1.5,
-                      ),
-                    ),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.event_available_outlined,
+                    size: 18,
+                    color: Color(0xFFF97316),
                   ),
-                ),
-                if (_showError) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Informe um valor antes de aceitar',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.red.shade400,
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'O passageiro aceitou sua proposta. Confirme ou recuse o agendamento.',
+                      style: TextStyle(
+                        fontFamily: 'QuasimodoSemiBold',
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                        height: 1.25,
+                      ),
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
-          ),
+            const SizedBox(height: 16),
+          ],
+
+          // Price input with shake animation
+          if (widget.request.status != 'awaiting_driver_confirmation')
+            AnimatedBuilder(
+              animation: _shakeAnimation,
+              builder: (_, child) {
+                final offset = _shakeController.isAnimating
+                    ? math.sin(_shakeAnimation.value * math.pi * 6) * 6
+                    : 0.0;
+                return Transform.translate(
+                  offset: Offset(offset, 0),
+                  child: child,
+                );
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Seu valor para esta corrida:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    key: const Key('price_input'),
+                    controller: _priceController,
+                    enabled: !hasKzProposal,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                    ],
+                    onChanged: (_) {
+                      if (_showError) setState(() => _showError = false);
+                    },
+                    decoration: InputDecoration(
+                      prefixText: 'R\$  ',
+                      hintText: '0,00',
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      filled: true,
+                      fillColor: hasKzProposal
+                          ? Colors.grey.shade200
+                          : Colors.grey.shade50,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: inputBorderColor,
+                          width: hasKzProposal || hasRejectedPrice || _showError
+                              ? 1.5
+                              : 1,
+                        ),
+                      ),
+                      disabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF16A34A),
+                          width: 1.5,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: inputBorderColor == Colors.grey.shade200
+                              ? AppColors.highlight
+                              : inputBorderColor,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (hasRejectedPrice) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.request.priceRejectionReason!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red.shade400,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  if (hasKzProposal) ...[
+                    const SizedBox(height: 4),
+                    const Text(
+                      'proposta feita pela KZ',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF16A34A),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                  if (_showError) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Informe um valor antes de aceitar',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red.shade400,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
 
           const SizedBox(height: 16),
 
@@ -231,9 +392,14 @@ class _TripRequestCardState extends State<TripRequestCard>
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text(
-                    'Recusar solicitação',
-                    style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 14),
+                  child: Text(
+                    widget.request.status == 'awaiting_driver_confirmation'
+                        ? 'Recusar'
+                        : 'Recusar solicitação',
+                    style: const TextStyle(
+                      fontFamily: 'OutfitBlack',
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ),
@@ -250,9 +416,14 @@ class _TripRequestCardState extends State<TripRequestCard>
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text(
-                    'Aceitar solicitação',
-                    style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 14),
+                  child: Text(
+                    widget.request.status == 'awaiting_driver_confirmation'
+                        ? 'Confirmar agendamento'
+                        : 'Aceitar solicitação',
+                    style: const TextStyle(
+                      fontFamily: 'OutfitBlack',
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ),
@@ -262,6 +433,14 @@ class _TripRequestCardState extends State<TripRequestCard>
       ),
     );
   }
+}
+
+String _formatShortDateTime(DateTime value) {
+  final day = value.day.toString().padLeft(2, '0');
+  final month = value.month.toString().padLeft(2, '0');
+  final hour = value.hour.toString().padLeft(2, '0');
+  final minute = value.minute.toString().padLeft(2, '0');
+  return '$day/$month às $hour:$minute';
 }
 
 class _RoutePoint extends StatelessWidget {
@@ -304,10 +483,7 @@ class _RoutePoint extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textPrimary,
-            ),
+            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),

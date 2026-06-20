@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:kz_servicos_prestador/features/home/domain/home_realtime_reload_policy.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
@@ -50,12 +53,15 @@ class ScheduledTripsService extends ChangeNotifier {
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'trip_driver_candidates',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'driver_profile_id',
-            value: _driverProfileId,
-          ),
-          callback: (_) => load(),
+          callback: (payload) {
+            if (HomeRealtimeReloadPolicy.candidateChangeTargetsDriver(
+              driverProfileId: _driverProfileId,
+              newRecord: payload.newRecord,
+              oldRecord: payload.oldRecord,
+            )) {
+              unawaited(load());
+            }
+          },
         )
         .subscribe();
 
@@ -65,12 +71,15 @@ class ScheduledTripsService extends ChangeNotifier {
           event: PostgresChangeEvent.update,
           schema: 'public',
           table: 'trips',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'driver_profile_id',
-            value: _driverProfileId,
-          ),
-          callback: (_) => load(),
+          callback: (payload) {
+            if (HomeRealtimeReloadPolicy.tripChangeTargetsDriver(
+              driverProfileId: _driverProfileId,
+              newRecord: payload.newRecord,
+              oldRecord: payload.oldRecord,
+            )) {
+              unawaited(load());
+            }
+          },
         )
         .subscribe();
   }

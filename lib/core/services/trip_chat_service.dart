@@ -9,6 +9,7 @@ class ChatEntryData {
   final String? roomId;
   final String clientId;
   final String clientName;
+  final String? clientAvatarUrl;
   final String title;
   final String subtitle;
   final String? lastMessage;
@@ -21,6 +22,7 @@ class ChatEntryData {
     this.roomId,
     required this.clientId,
     required this.clientName,
+    this.clientAvatarUrl,
     required this.title,
     required this.subtitle,
     this.lastMessage,
@@ -60,6 +62,7 @@ class ChatPageArgs {
   final String title;
   final String subtitle;
   final String clientName;
+  final String? clientAvatarUrl;
   final String clientId;
   final String? tripId;
   final String? serviceRequestId;
@@ -69,6 +72,7 @@ class ChatPageArgs {
     required this.title,
     required this.subtitle,
     required this.clientName,
+    this.clientAvatarUrl,
     required this.clientId,
     this.tripId,
     this.serviceRequestId,
@@ -84,14 +88,14 @@ class TripChatService {
       '*, '
       'pickup_address:addresses!pickup_address_id(formatted_address), '
       'dropoff_address:addresses!dropoff_address_id(formatted_address), '
-      'client:users!client_id(id, full_name), '
+      'client:users!client_id(id, full_name, avatar_url), '
       'chat_rooms!trip_id(id, chat_messages(id, message, created_at, sender_id, is_read))';
 
   static const _serviceRequestSelect =
       '*, '
       'service_categories(name), '
       'address:addresses!address_id(formatted_address), '
-      'client:users!client_id(id, full_name), '
+      'client:users!client_id(id, full_name, avatar_url), '
       'chat_rooms!service_request_id(id, chat_messages(id, message, created_at, sender_id, is_read))';
 
   Future<List<ChatEntryData>> getChatsForDriver(
@@ -103,14 +107,36 @@ class TripChatService {
           .from('trips')
           .select(_tripSelect)
           .eq('driver_profile_id', driverProfileId)
-          .inFilter('status', ['scheduled', 'started', 'finished'])
+          .inFilter('status', [
+            'awaiting_driver_confirmation',
+            'scheduled',
+            'started',
+            'finished',
+          ])
           .order('scheduled_datetime', ascending: false);
       return (res as List)
-          .map((r) => buildEntryFromTrip(r as Map<String, dynamic>, currentUserId))
+          .map(
+            (r) => buildEntryFromTrip(r as Map<String, dynamic>, currentUserId),
+          )
           .toList();
     } catch (e) {
       debugPrint('[TripChatService] getChatsForDriver erro: $e');
       return [];
+    }
+  }
+
+  Future<int> countUnreadForProvider(String currentUserId) async {
+    try {
+      final res = await _client
+          .from('chat_messages')
+          .select('id, chat_rooms!inner(provider_id)')
+          .eq('chat_rooms.provider_id', currentUserId)
+          .neq('sender_id', currentUserId)
+          .eq('is_read', false);
+      return (res as List).length;
+    } catch (e) {
+      debugPrint('[TripChatService] countUnreadForProvider erro: $e');
+      return 0;
     }
   }
 
@@ -126,7 +152,12 @@ class TripChatService {
           .inFilter('status', ['assigned', 'in_progress', 'finished'])
           .order('service_date', ascending: false);
       return (res as List)
-          .map((r) => buildEntryFromServiceRequest(r as Map<String, dynamic>, currentUserId))
+          .map(
+            (r) => buildEntryFromServiceRequest(
+              r as Map<String, dynamic>,
+              currentUserId,
+            ),
+          )
           .toList();
     } catch (e) {
       debugPrint('[TripChatService] getChatsForServiceProvider erro: $e');
@@ -162,7 +193,9 @@ class TripChatService {
         'provider_id': providerId,
       };
       if (tripId != null) insert['trip_id'] = tripId;
-      if (serviceRequestId != null) insert['service_request_id'] = serviceRequestId;
+      if (serviceRequestId != null) {
+        insert['service_request_id'] = serviceRequestId;
+      }
 
       final res = await _client
           .from('chat_rooms')
@@ -231,8 +264,11 @@ class TripChatService {
     final msgs = ((room?['chat_messages'] as List?) ?? [])
         .cast<Map<String, dynamic>>();
 
-    msgs.sort((a, b) => DateTime.parse(b['created_at'] as String)
-        .compareTo(DateTime.parse(a['created_at'] as String)));
+    msgs.sort(
+      (a, b) => DateTime.parse(
+        b['created_at'] as String,
+      ).compareTo(DateTime.parse(a['created_at'] as String)),
+    );
 
     final lastMsg = msgs.isNotEmpty ? msgs.first : null;
     final unread = msgs
@@ -244,8 +280,8 @@ class TripChatService {
     final subtitle = origin.isNotEmpty && destination.isNotEmpty
         ? '$origin → $destination'
         : origin.isNotEmpty
-            ? origin
-            : destination;
+        ? origin
+        : destination;
 
     final scheduledStr = row['scheduled_datetime'] as String?;
     final title = scheduledStr != null
@@ -258,6 +294,7 @@ class TripChatService {
       roomId: roomId,
       clientId: client['id'] as String? ?? '',
       clientName: client['full_name'] as String? ?? 'Cliente',
+      clientAvatarUrl: client['avatar_url'] as String?,
       title: title,
       subtitle: subtitle,
       lastMessage: lastMsg?['message'] as String?,
@@ -283,8 +320,11 @@ class TripChatService {
     final msgs = ((room?['chat_messages'] as List?) ?? [])
         .cast<Map<String, dynamic>>();
 
-    msgs.sort((a, b) => DateTime.parse(b['created_at'] as String)
-        .compareTo(DateTime.parse(a['created_at'] as String)));
+    msgs.sort(
+      (a, b) => DateTime.parse(
+        b['created_at'] as String,
+      ).compareTo(DateTime.parse(a['created_at'] as String)),
+    );
 
     final lastMsg = msgs.isNotEmpty ? msgs.first : null;
     final unread = msgs
@@ -305,6 +345,7 @@ class TripChatService {
       roomId: roomId,
       clientId: client['id'] as String? ?? '',
       clientName: client['full_name'] as String? ?? 'Cliente',
+      clientAvatarUrl: client['avatar_url'] as String?,
       title: title,
       subtitle: subtitle,
       lastMessage: lastMsg?['message'] as String?,

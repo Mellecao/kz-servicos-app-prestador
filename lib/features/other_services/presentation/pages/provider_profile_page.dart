@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/constants/category_colors.dart';
@@ -25,6 +26,7 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
   ProviderProfileData? _profile;
   bool _loading = true;
   String? _avatarPath;
+  bool _isUploadingPhoto = false;
 
   @override
   void initState() {
@@ -64,9 +66,56 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
       ),
     );
     if (source == null) return;
-    final picked = await ImagePicker().pickImage(source: source);
-    if (picked != null) {
-      setState(() => _avatarPath = picked.path);
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 800,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _avatarPath = picked.path;
+      _isUploadingPhoto = true;
+    });
+
+    try {
+      final userId = AuthState.userId!;
+      final ext = picked.path.split('.').last.toLowerCase();
+      final storagePath = 'users/$userId/avatar.$ext';
+      final supabase = Supabase.instance.client;
+
+      await supabase.storage
+          .from('Profile_Images')
+          .upload(
+            storagePath,
+            File(picked.path),
+            fileOptions: const FileOptions(upsert: true),
+          );
+
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final publicUrl =
+          '${supabase.storage.from('Profile_Images').getPublicUrl(storagePath)}?v=$ts';
+
+      await supabase
+          .from('users')
+          .update({'avatar_url': publicUrl})
+          .eq('id', userId);
+
+      if (mounted) {
+        setState(() => _avatarPath = null);
+        await _load();
+      }
+    } catch (e) {
+      debugPrint('[KZ] avatar upload erro: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao salvar foto. Tente novamente.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
     }
   }
 
@@ -85,8 +134,7 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
                     onRefresh: _load,
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(
-                          24, 24, 24, bottomPad + 100),
+                      padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPad + 100),
                       child: Column(
                         children: [
                           _buildHeader(),
@@ -128,12 +176,17 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
           children: [
             CircleAvatar(
               radius: 48,
-              backgroundColor:
-                  AppColors.highlight.withValues(alpha: 0.15),
+              backgroundColor: AppColors.highlight.withValues(alpha: 0.15),
               backgroundImage: _avatarPath != null
-                  ? FileImage(File(_avatarPath!))
-                  : null,
-              child: _avatarPath == null
+                  ? FileImage(File(_avatarPath!)) as ImageProvider
+                  : (_profile?.avatarUrl != null &&
+                            _profile!.avatarUrl!.isNotEmpty
+                        ? NetworkImage(_profile!.avatarUrl!)
+                        : null),
+              child:
+                  (_avatarPath == null &&
+                      (_profile?.avatarUrl == null ||
+                          _profile!.avatarUrl!.isEmpty))
                   ? Text(
                       initial,
                       style: const TextStyle(
@@ -144,24 +197,41 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
                     )
                   : null,
             ),
+            if (_isUploadingPhoto)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0x66000000),
+                  ),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             Positioned(
               bottom: 0,
               right: 0,
               child: GestureDetector(
-                onTap: _onEditPhoto,
+                onTap: _isUploadingPhoto ? null : _onEditPhoto,
                 child: Container(
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: AppColors.highlight,
+                    color: _isUploadingPhoto
+                        ? Colors.grey.shade400
+                        : AppColors.highlight,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
-                  child: const Icon(
-                    Icons.edit,
-                    color: Colors.white,
-                    size: 16,
-                  ),
+                  child: const Icon(Icons.edit, color: Colors.white, size: 16),
                 ),
               ),
             ),
@@ -179,10 +249,7 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
         const SizedBox(height: 4),
         Text(
           email,
-          style: const TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
-          ),
+          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
         ),
       ],
     );
@@ -190,8 +257,7 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
 
   Widget _buildOnlineStatus() {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFF2ECC71).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(14),
@@ -277,8 +343,7 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
           if (categories.isEmpty)
             const Text(
               'Nenhuma categoria cadastrada',
-              style: TextStyle(
-                  fontSize: 13, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             )
           else
             Wrap(
@@ -288,7 +353,9 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
                 final color = categoryColorFor(cat);
                 return Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 8),
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
@@ -313,8 +380,7 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -336,17 +402,15 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
                 icon: Icons.phone_outlined,
                 label: 'Telefone',
                 value: '(11) 99999-0000',
-                onTap: () =>
-                    launchUrl(Uri.parse('tel:+5511999990000')),
+                onTap: () => launchUrl(Uri.parse('tel:+5511999990000')),
               ),
               const Divider(height: 24),
               _HelpRow(
                 icon: Icons.email_outlined,
                 label: 'E-mail',
                 value: 'contato@kzservicos.com.br',
-                onTap: () => launchUrl(
-                  Uri.parse('mailto:contato@kzservicos.com.br'),
-                ),
+                onTap: () =>
+                    launchUrl(Uri.parse('mailto:contato@kzservicos.com.br')),
               ),
               const Divider(height: 24),
               _HelpRow(
@@ -422,6 +486,11 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
             icon: Icons.history_rounded,
             label: 'Histórico de serviços',
             onTap: () {},
+          ),
+          _MenuItem(
+            icon: Icons.card_giftcard_rounded,
+            label: 'Clube de benefícios',
+            onTap: () => context.push('/benefits'),
           ),
           _MenuItem(
             icon: Icons.security_outlined,
@@ -518,8 +587,7 @@ class _HelpRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Row(
         children: [
-          Icon(icon,
-              color: iconColor ?? AppColors.secondary, size: 22),
+          Icon(icon, color: iconColor ?? AppColors.secondary, size: 22),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -570,8 +638,7 @@ class _MenuItem extends StatelessWidget {
     return Column(
       children: [
         ListTile(
-          leading:
-              Icon(icon, color: color ?? AppColors.textSecondary),
+          leading: Icon(icon, color: color ?? AppColors.textSecondary),
           title: Text(
             label,
             style: TextStyle(
@@ -587,11 +654,7 @@ class _MenuItem extends StatelessWidget {
           onTap: onTap,
         ),
         if (showDivider)
-          Divider(
-            height: 1,
-            indent: 56,
-            color: Colors.grey.shade200,
-          ),
+          Divider(height: 1, indent: 56, color: Colors.grey.shade200),
       ],
     );
   }

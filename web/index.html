@@ -32,11 +32,27 @@
   <title>kz_servicos_prestador</title>
   <link rel="manifest" href="manifest.json">
   <script>
-    window.gm_authFailure = function() {
-      console.error('[KZ DEBUG] Google Maps auth failure. Verifique: 1) Billing ativo no projeto 2) API key sem restrições de API 3) Maps JavaScript API habilitada no projeto correto');
-    };
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      const provider = (
+        params.get('mapProvider') ||
+        window.localStorage.getItem('MAP_PROVIDER') ||
+        'google'
+      ).toLowerCase();
+
+      window.KZ_MAP_PROVIDER = provider;
+      window.gm_authFailure = function() {
+        console.error('[KZ DEBUG] Google Maps auth failure. Verifique: 1) Billing ativo no projeto 2) API key sem restrições de API 3) Maps JavaScript API habilitada no projeto correto');
+      };
+
+      if (provider !== 'google') return;
+
+      const script = document.createElement('script');
+      script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCwDyzjfdpfbRU06n6GwzlqbIj_-xfgLHw&libraries=places&v=weekly';
+      script.async = true;
+      document.head.appendChild(script);
+    })();
   </script>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyChT4wSYd-b3fT7xfEvUvmgJ0QfZv7MYSE&libraries=places&v=weekly"></script>
 </head>
 <body>
   <!--

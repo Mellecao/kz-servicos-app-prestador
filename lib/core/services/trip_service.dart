@@ -1,23 +1,33 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
+import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
 
 const _tripSelect =
     '*, pickup_address:addresses!pickup_address_id(formatted_address,latitude,longitude), '
     'dropoff_address:addresses!dropoff_address_id(formatted_address,latitude,longitude), '
-    'client:users!client_id(full_name,phone)';
+    'client:users!client_id(full_name,phone,avatar_url)';
 
 const _tripDetailSelect =
     '*, pickup_address:addresses!pickup_address_id(formatted_address,latitude,longitude), '
     'dropoff_address:addresses!dropoff_address_id(formatted_address,latitude,longitude), '
-    'client:users!client_id(full_name,phone), '
+    'client:users!client_id(full_name,phone,avatar_url), '
     'trip_children(*), trip_luggage(*)';
 
 const _tripHistorySelect =
     '*, pickup_address:addresses!pickup_address_id(formatted_address,latitude,longitude), '
     'dropoff_address:addresses!dropoff_address_id(formatted_address,latitude,longitude), '
-    'client:users!client_id(full_name), '
+    'client:users!client_id(full_name,avatar_url), '
     'ratings(score)';
+
+const _activeTripSelect =
+    '*, pickup_address:addresses!pickup_address_id(formatted_address,latitude,longitude), '
+    'dropoff_address:addresses!dropoff_address_id(formatted_address,latitude,longitude), '
+    'client:users!client_id(full_name,phone,avatar_url), '
+    'trip_driver_candidates(id, offered_price, status, price_rejection_reason, kz_proposed_price, kz_proposal_locked)';
+
+const _candidateFields =
+    'id, status, offered_price, price_rejection_reason, kz_proposed_price, kz_proposal_locked';
 
 class TripService {
   final SupabaseClient _client = Supabase.instance.client;
@@ -27,7 +37,7 @@ class TripService {
     try {
       final res = await _client
           .from('trip_driver_candidates')
-          .select('id, trip:trips!trip_id($_tripSelect)')
+          .select('$_candidateFields, trip:trips!trip_id($_tripSelect)')
           .eq('driver_profile_id', driverProfileId)
           .eq('status', 'pending');
       return (res as List)
@@ -35,9 +45,18 @@ class TripService {
             final cMap = c as Map<String, dynamic>;
             final trip = cMap['trip'] as Map<String, dynamic>?;
             if (trip == null) return null;
-            return TripData.fromMap({...trip, 'candidate_id': cMap['id']});
+            return TripData.fromMap({
+              ...trip,
+              'candidate_id': cMap['id'] ?? '',
+              'candidate_status': cMap['status'],
+              'offered_price': cMap['offered_price'],
+              'price_rejection_reason': cMap['price_rejection_reason'],
+              'kz_proposed_price': cMap['kz_proposed_price'],
+              'kz_proposal_locked': cMap['kz_proposal_locked'],
+            });
           })
           .whereType<TripData>()
+          .where((trip) => trip.status == 'searching_drivers')
           .toList();
     } catch (e) {
       debugPrint('[TripService] getDriverInvitations erro: $e');
@@ -46,11 +65,13 @@ class TripService {
   }
 
   /// Candidaturas aceitas pelo motorista ainda aguardando aprovação — tela agendamentos e carousel.
-  Future<List<TripData>> getDriverAcceptedCandidacies(String driverProfileId) async {
+  Future<List<TripData>> getDriverAcceptedCandidacies(
+    String driverProfileId,
+  ) async {
     try {
       final res = await _client
           .from('trip_driver_candidates')
-          .select('id, status, offered_price, trip:trips!trip_id($_tripSelect)')
+          .select('$_candidateFields, trip:trips!trip_id($_tripSelect)')
           .eq('driver_profile_id', driverProfileId)
           .eq('status', 'accepted');
       return (res as List)
@@ -63,12 +84,17 @@ class TripService {
               'candidate_id': cMap['id'] ?? '',
               'candidate_status': cMap['status'],
               'offered_price': cMap['offered_price'],
+              'price_rejection_reason': cMap['price_rejection_reason'],
+              'kz_proposed_price': cMap['kz_proposed_price'],
+              'kz_proposal_locked': cMap['kz_proposal_locked'],
             });
           })
           .whereType<TripData>()
-          .where((trip) =>
-              trip.status == 'searching_drivers' ||
-              trip.status == 'awaiting_client_confirmation')
+          .where(
+            (trip) =>
+                trip.status == 'searching_drivers' ||
+                trip.status == 'awaiting_client_confirmation',
+          )
           .toList();
     } catch (e) {
       debugPrint('[TripService] getDriverAcceptedCandidacies erro: $e');
@@ -137,9 +163,31 @@ class TripService {
             'scheduled',
           ])
           .order('scheduled_datetime');
-      return (res as List).map((m) => TripData.fromMap(m as Map<String, dynamic>)).toList();
+      return (res as List)
+          .map((m) => TripData.fromMap(m as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       debugPrint('[TripService] getDriverScheduledTrips erro: $e');
+      return [];
+    }
+  }
+
+  /// Viagens que o passageiro ja aceitou e aguardam validacao final do motorista.
+  Future<List<TripData>> getDriverRecheckRequests(
+    String driverProfileId,
+  ) async {
+    try {
+      final res = await _client
+          .from('trips')
+          .select(_tripSelect)
+          .eq('driver_profile_id', driverProfileId)
+          .eq('status', 'awaiting_driver_confirmation')
+          .order('scheduled_datetime');
+      return (res as List)
+          .map((m) => TripData.fromMap(m as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('[TripService] getDriverRecheckRequests erro: $e');
       return [];
     }
   }
@@ -155,6 +203,45 @@ class TripService {
     } catch (e) {
       debugPrint('[TripService] startTrip erro: $e');
       return false;
+    }
+  }
+
+  Future<ActiveTripData?> getActiveTripById(
+    String tripId, {
+    String? driverProfileId,
+  }) async {
+    try {
+      var query = _client
+          .from('trips')
+          .select(_activeTripSelect)
+          .eq('id', tripId);
+      if (driverProfileId != null) {
+        query = query.eq('driver_profile_id', driverProfileId);
+      }
+      final res = await query.maybeSingle();
+      if (res == null) return null;
+      return ActiveTripData.fromMap(res);
+    } catch (e) {
+      debugPrint('[TripService] getActiveTripById erro: $e');
+      return null;
+    }
+  }
+
+  Future<ActiveTripData?> getCurrentActiveTrip(String driverProfileId) async {
+    try {
+      final res = await _client
+          .from('trips')
+          .select(_activeTripSelect)
+          .eq('driver_profile_id', driverProfileId)
+          .eq('status', 'started')
+          .order('scheduled_datetime', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      if (res == null) return null;
+      return ActiveTripData.fromMap(res);
+    } catch (e) {
+      debugPrint('[TripService] getCurrentActiveTrip erro: $e');
+      return null;
     }
   }
 
@@ -182,7 +269,9 @@ class TripService {
           .eq('driver_profile_id', providerProfileId)
           .eq('status', 'finished')
           .order('finished_at', ascending: false);
-      return (res as List).map((m) => TripData.fromMap(m as Map<String, dynamic>)).toList();
+      return (res as List)
+          .map((m) => TripData.fromMap(m as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       debugPrint('[TripService] getDriverTripHistory erro: $e');
       return [];
@@ -190,12 +279,18 @@ class TripService {
   }
 
   /// Aceita uma corrida disponível da home (status searching_drivers).
-  Future<bool> acceptAvailableTrip(String tripId, String providerProfileId) async {
+  Future<bool> acceptAvailableTrip(
+    String tripId,
+    String providerProfileId,
+  ) async {
     try {
-      await _client.from('trips').update({
-        'driver_profile_id': providerProfileId,
-        'status': 'awaiting_client_confirmation',
-      }).eq('id', tripId);
+      await _client
+          .from('trips')
+          .update({
+            'driver_profile_id': providerProfileId,
+            'status': 'awaiting_client_confirmation',
+          })
+          .eq('id', tripId);
       return true;
     } catch (e) {
       debugPrint('[TripService] acceptAvailableTrip erro: $e');
@@ -204,13 +299,19 @@ class TripService {
   }
 
   /// Confirma um agendamento aguardando confirmação do motorista.
-  Future<bool> confirmScheduledTrip(String tripId, String? driverObservation) async {
+  Future<bool> confirmScheduledTrip(
+    String tripId,
+    String? driverObservation,
+  ) async {
     try {
-      await _client.from('trips').update({
-        'status': 'scheduled',
-        if (driverObservation != null && driverObservation.isNotEmpty)
-          'driver_observations': driverObservation,
-      }).eq('id', tripId);
+      await _client
+          .from('trips')
+          .update({
+            'status': 'scheduled',
+            if (driverObservation != null && driverObservation.isNotEmpty)
+              'driver_observations': driverObservation,
+          })
+          .eq('id', tripId);
       return true;
     } catch (e) {
       debugPrint('[TripService] confirmScheduledTrip erro: $e');
@@ -219,13 +320,31 @@ class TripService {
   }
 
   /// Recusa uma corrida (disponível ou agendamento).
-  Future<bool> rejectTrip(String tripId, String reason) async {
+  Future<bool> rejectTrip(
+    String tripId,
+    String reason, {
+    String? driverProfileId,
+  }) async {
     try {
-      await _client.from('trips').update({
-        'driver_profile_id': null,
-        'status': 'searching_drivers',
-        'driver_observations': reason,
-      }).eq('id', tripId);
+      await _client
+          .from('trips')
+          .update({
+            'driver_profile_id': null,
+            'status': 'searching_drivers',
+            'driver_observations': reason,
+          })
+          .eq('id', tripId);
+      if (driverProfileId != null && driverProfileId.isNotEmpty) {
+        await _client
+            .from('trip_driver_candidates')
+            .update({
+              'status': 'rejected',
+              'responded_at': DateTime.now().toIso8601String(),
+              'observations': reason,
+            })
+            .eq('trip_id', tripId)
+            .eq('driver_profile_id', driverProfileId);
+      }
       return true;
     } catch (e) {
       debugPrint('[TripService] rejectTrip erro: $e');
@@ -238,7 +357,9 @@ class TripService {
     try {
       final res = await _client
           .from('trips')
-          .select('id, estimated_price, final_price, scheduled_datetime, finished_at, payment_method, is_driver_paied, status, payment_date')
+          .select(
+            'id, estimated_price, final_price, scheduled_datetime, finished_at, payment_method, is_driver_paied, status, payment_date',
+          )
           .eq('driver_profile_id', driverProfileId)
           .order('scheduled_datetime', ascending: false);
 
@@ -329,18 +450,18 @@ class EarningsData {
         );
 
   factory EarningsData.empty() => const EarningsData(
-        availableBalance: 0,
-        totalReceived: 0,
-        currentMonthTotal: 0,
-        previousMonthTotal: 0,
-        dailyEarning: PeriodEarning(total: 0, trips: 0),
-        weeklyEarning: PeriodEarning(total: 0, trips: 0),
-        monthlyEarning: PeriodEarning(total: 0, trips: 0),
-        yearlyEarning: PeriodEarning(total: 0, trips: 0),
-        monthlyHistory: [],
-        recentEntries: [],
-        totalTrips: 0,
-      );
+    availableBalance: 0,
+    totalReceived: 0,
+    currentMonthTotal: 0,
+    previousMonthTotal: 0,
+    dailyEarning: PeriodEarning(total: 0, trips: 0),
+    weeklyEarning: PeriodEarning(total: 0, trips: 0),
+    monthlyEarning: PeriodEarning(total: 0, trips: 0),
+    yearlyEarning: PeriodEarning(total: 0, trips: 0),
+    monthlyHistory: [],
+    recentEntries: [],
+    totalTrips: 0,
+  );
 
   factory EarningsData.fromTrips(List<Map<String, dynamic>> trips) {
     final now = DateTime.now();
@@ -351,7 +472,9 @@ class EarningsData {
     final yearStart = DateTime(now.year, 1, 1);
 
     final paidTrips = trips.where((t) => t['is_driver_paied'] == true).toList();
-    final unpaidTrips = trips.where((t) => t['is_driver_paied'] != true).toList();
+    final unpaidTrips = trips
+        .where((t) => t['is_driver_paied'] != true)
+        .toList();
 
     // Valor a receber: TODAS as corridas onde is_driver_paied = false
     double availableBalance = 0;
@@ -374,13 +497,26 @@ class EarningsData {
       final price =
           ((t['final_price'] ?? t['estimated_price']) as num?)?.toDouble() ?? 0;
       final dateStr =
-          (t['payment_date'] ?? t['finished_at'] ?? t['scheduled_datetime']) as String?;
+          (t['payment_date'] ?? t['finished_at'] ?? t['scheduled_datetime'])
+              as String?;
       if (dateStr == null) continue;
       final date = DateTime.parse(dateStr);
-      if (!date.isBefore(yearStart)) { yearly += price; yearlyCount++; }
-      if (!date.isBefore(monthStart)) { monthly += price; monthlyCount++; }
-      if (!date.isBefore(weekStart)) { weekly += price; weeklyCount++; }
-      if (!date.isBefore(todayStart)) { daily += price; dailyCount++; }
+      if (!date.isBefore(yearStart)) {
+        yearly += price;
+        yearlyCount++;
+      }
+      if (!date.isBefore(monthStart)) {
+        monthly += price;
+        monthlyCount++;
+      }
+      if (!date.isBefore(weekStart)) {
+        weekly += price;
+        weeklyCount++;
+      }
+      if (!date.isBefore(todayStart)) {
+        daily += price;
+        dailyCount++;
+      }
     }
 
     // Histórico mensal: TODAS as corridas (pagas e não pagas) agrupadas por mês
@@ -391,7 +527,8 @@ class EarningsData {
       final price =
           ((t['final_price'] ?? t['estimated_price']) as num?)?.toDouble() ?? 0;
       final dateStr =
-          (t['payment_date'] ?? t['finished_at'] ?? t['scheduled_datetime']) as String?;
+          (t['payment_date'] ?? t['finished_at'] ?? t['scheduled_datetime'])
+              as String?;
       if (dateStr == null) continue;
       final date = DateTime.parse(dateStr);
 
@@ -411,17 +548,24 @@ class EarningsData {
     }
 
     final history = monthMap.values.toList()
-      ..sort((a, b) =>
-          DateTime(a.year, a.month).compareTo(DateTime(b.year, b.month)));
+      ..sort(
+        (a, b) =>
+            DateTime(a.year, a.month).compareTo(DateTime(b.year, b.month)),
+      );
 
     // Extrato: últimas 10 corridas do motorista (pagas e não pagas)
     final entries = trips.take(10).map((t) {
       final price =
           ((t['final_price'] ?? t['estimated_price']) as num?)?.toDouble() ?? 0;
       final dateStr =
-          (t['payment_date'] ?? t['finished_at'] ?? t['scheduled_datetime'] ?? '') as String;
-      final date =
-          dateStr.isNotEmpty ? DateTime.parse(dateStr) : DateTime.now();
+          (t['payment_date'] ??
+                  t['finished_at'] ??
+                  t['scheduled_datetime'] ??
+                  '')
+              as String;
+      final date = dateStr.isNotEmpty
+          ? DateTime.parse(dateStr)
+          : DateTime.now();
       return EarningEntry(
         id: t['id'] as String? ?? '',
         description: 'Corrida',
@@ -482,10 +626,22 @@ class EarningsData {
       final dateStr = r['service_date'] as String?;
       if (dateStr == null) continue;
       final date = DateTime.parse(dateStr);
-      if (!date.isBefore(yearStart)) { yearly += price; yearlyCount++; }
-      if (!date.isBefore(monthStart)) { monthly += price; monthlyCount++; }
-      if (!date.isBefore(weekStart)) { weekly += price; weeklyCount++; }
-      if (!date.isBefore(todayStart)) { daily += price; dailyCount++; }
+      if (!date.isBefore(yearStart)) {
+        yearly += price;
+        yearlyCount++;
+      }
+      if (!date.isBefore(monthStart)) {
+        monthly += price;
+        monthlyCount++;
+      }
+      if (!date.isBefore(weekStart)) {
+        weekly += price;
+        weeklyCount++;
+      }
+      if (!date.isBefore(todayStart)) {
+        daily += price;
+        dailyCount++;
+      }
     }
 
     double currentMonthAll = 0, prevMonthAll = 0;
@@ -513,15 +669,18 @@ class EarningsData {
     }
 
     final history = monthMap.values.toList()
-      ..sort((a, b) =>
-          DateTime(a.year, a.month).compareTo(DateTime(b.year, b.month)));
+      ..sort(
+        (a, b) =>
+            DateTime(a.year, a.month).compareTo(DateTime(b.year, b.month)),
+      );
 
     final entries = requests.take(10).map((r) {
       final price =
           ((r['final_price'] ?? r['estimated_price']) as num?)?.toDouble() ?? 0;
       final dateStr = (r['service_date'] ?? '') as String;
-      final date =
-          dateStr.isNotEmpty ? DateTime.parse(dateStr) : DateTime.now();
+      final date = dateStr.isNotEmpty
+          ? DateTime.parse(dateStr)
+          : DateTime.now();
       return EarningEntry(
         id: r['id'] as String? ?? '',
         description: 'Serviço',

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/models/driver_profile_data.dart';
@@ -24,6 +25,9 @@ class _ProfilePageState extends State<ProfilePage> {
   DriverProfileData? _profile;
   bool _loading = true;
   String? _avatarPath;
+  bool _isUploadingPhoto = false;
+  bool _isUploadingVehiclePhoto = false;
+  bool _isUploadingDriverPhoto = false;
 
   @override
   void initState() {
@@ -64,9 +68,205 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
     if (source == null) return;
-    final picked = await ImagePicker().pickImage(source: source);
-    if (picked != null) {
-      setState(() => _avatarPath = picked.path);
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 800,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _avatarPath = picked.path;
+      _isUploadingPhoto = true;
+    });
+
+    try {
+      final userId = AuthState.userId!;
+      final ext = picked.path.split('.').last.toLowerCase();
+      final storagePath = 'users/$userId/avatar.$ext';
+      final supabase = Supabase.instance.client;
+
+      await supabase.storage
+          .from('Profile_Images')
+          .upload(
+            storagePath,
+            File(picked.path),
+            fileOptions: const FileOptions(upsert: true),
+          );
+
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final publicUrl =
+          '${supabase.storage.from('Profile_Images').getPublicUrl(storagePath)}?v=$ts';
+
+      await supabase
+          .from('users')
+          .update({'avatar_url': publicUrl})
+          .eq('id', userId);
+
+      if (mounted) {
+        setState(() => _avatarPath = null);
+        await _load();
+      }
+    } catch (e) {
+      debugPrint('[KZ] avatar upload erro: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao salvar foto. Tente novamente.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
+  Future<void> _onAddVehiclePhoto() async {
+    final vehicleId = _profile?.vehicle?.id;
+    if (vehicleId == null || vehicleId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cadastre um veículo antes de enviar foto.'),
+        ),
+      );
+      return;
+    }
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Câmera'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Galeria'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 1200,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => _isUploadingVehiclePhoto = true);
+    try {
+      final ext = picked.path.split('.').last.toLowerCase();
+      final storagePath =
+          'vehicles/$vehicleId/${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final supabase = Supabase.instance.client;
+      await supabase.storage
+          .from('Vehicle_Photos')
+          .upload(
+            storagePath,
+            File(picked.path),
+            fileOptions: const FileOptions(upsert: false),
+          );
+      final publicUrl = supabase.storage
+          .from('Vehicle_Photos')
+          .getPublicUrl(storagePath);
+      await supabase.from('vehicle_photos').insert({
+        'vehicle_id': vehicleId,
+        'photo_url': publicUrl,
+        'photo_type': 'front',
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Foto do carro enviada.')));
+      }
+    } catch (e) {
+      debugPrint('[KZ] vehicle photo upload erro: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao salvar foto do carro.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingVehiclePhoto = false);
+    }
+  }
+
+  Future<void> _onAddDriverPhoto() async {
+    final driverProfileId = _profile?.driverProfileId;
+    if (driverProfileId == null || driverProfileId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Perfil do motorista não encontrado.')),
+      );
+      return;
+    }
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Câmera'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Galeria'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 1200,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => _isUploadingDriverPhoto = true);
+    try {
+      final ext = picked.path.split('.').last.toLowerCase();
+      final storagePath =
+          'drivers/$driverProfileId/${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final supabase = Supabase.instance.client;
+      await supabase.storage
+          .from('Profile_Images')
+          .upload(
+            storagePath,
+            File(picked.path),
+            fileOptions: const FileOptions(upsert: false),
+          );
+      final publicUrl = supabase.storage
+          .from('Profile_Images')
+          .getPublicUrl(storagePath);
+      await supabase.from('driver_profile_photos').insert({
+        'driver_profile_id': driverProfileId,
+        'photo_url': publicUrl,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Foto do motorista enviada.')),
+        );
+      }
+    } catch (e) {
+      debugPrint('[KZ] driver photo upload erro: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao salvar foto do motorista.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingDriverPhoto = false);
     }
   }
 
@@ -86,7 +286,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: EdgeInsets.fromLTRB(
-                          24, 24, 24, bottomPadding + 100),
+                        24,
+                        24,
+                        24,
+                        bottomPadding + 100,
+                      ),
                       child: Column(
                         children: [
                           _buildHeader(),
@@ -115,6 +319,27 @@ class _ProfilePageState extends State<ProfilePage> {
                               icon: Icons.calendar_today,
                               label: 'Ano',
                               value: _profile?.vehicle?.year.toString() ?? '-',
+                            ),
+                            _ActionRow(
+                              icon: Icons.add_a_photo_outlined,
+                              label: _isUploadingVehiclePhoto
+                                  ? 'Enviando foto...'
+                                  : 'Adicionar foto do carro',
+                              onTap: _isUploadingVehiclePhoto
+                                  ? null
+                                  : _onAddVehiclePhoto,
+                            ),
+                          ]),
+                          const SizedBox(height: 16),
+                          _buildSection('Fotos do motorista', [
+                            _ActionRow(
+                              icon: Icons.add_photo_alternate_outlined,
+                              label: _isUploadingDriverPhoto
+                                  ? 'Enviando foto...'
+                                  : 'Adicionar foto ao perfil público',
+                              onTap: _isUploadingDriverPhoto
+                                  ? null
+                                  : _onAddDriverPhoto,
                             ),
                           ]),
                           const SizedBox(height: 16),
@@ -163,9 +388,16 @@ class _ProfilePageState extends State<ProfilePage> {
             CircleAvatar(
               radius: 48,
               backgroundColor: AppColors.highlight.withValues(alpha: 0.15),
-              backgroundImage:
-                  _avatarPath != null ? FileImage(File(_avatarPath!)) : null,
-              child: _avatarPath == null
+              backgroundImage: _avatarPath != null
+                  ? FileImage(File(_avatarPath!)) as ImageProvider
+                  : (_profile?.avatarUrl != null &&
+                            _profile!.avatarUrl!.isNotEmpty
+                        ? NetworkImage(_profile!.avatarUrl!)
+                        : null),
+              child:
+                  (_avatarPath == null &&
+                      (_profile?.avatarUrl == null ||
+                          _profile!.avatarUrl!.isEmpty))
                   ? Text(
                       initial,
                       style: const TextStyle(
@@ -176,16 +408,37 @@ class _ProfilePageState extends State<ProfilePage> {
                     )
                   : null,
             ),
+            if (_isUploadingPhoto)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0x66000000),
+                  ),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             Positioned(
               bottom: 0,
               right: 0,
               child: GestureDetector(
-                onTap: _onEditPhoto,
+                onTap: _isUploadingPhoto ? null : _onEditPhoto,
                 child: Container(
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: AppColors.highlight,
+                    color: _isUploadingPhoto
+                        ? Colors.grey.shade400
+                        : AppColors.highlight,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
@@ -338,9 +591,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 icon: Icons.email_outlined,
                 label: 'E-mail',
                 value: 'contato@kzservicos.com.br',
-                onTap: () => launchUrl(
-                  Uri.parse('mailto:contato@kzservicos.com.br'),
-                ),
+                onTap: () =>
+                    launchUrl(Uri.parse('mailto:contato@kzservicos.com.br')),
               ),
               const Divider(height: 24),
               _HelpContactRow(
@@ -418,6 +670,11 @@ class _ProfilePageState extends State<ProfilePage> {
             onTap: () => context.push('/trip-history'),
           ),
           _MenuItem(
+            icon: Icons.card_giftcard_rounded,
+            label: 'Clube de benefícios',
+            onTap: () => context.push('/benefits'),
+          ),
+          _MenuItem(
             icon: Icons.security_outlined,
             label: 'Segurança',
             onTap: () => context.push('/security-settings'),
@@ -479,7 +736,9 @@ class _StatCard extends StatelessWidget {
             Text(
               label,
               style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary),
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -509,8 +768,10 @@ class _InfoRow extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             '$label:',
-            style:
-                const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -525,6 +786,47 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  const _ActionRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: AppColors.highlight),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: onTap == null
+                      ? AppColors.textSecondary
+                      : AppColors.highlight,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -561,7 +863,9 @@ class _HelpContactRow extends StatelessWidget {
                 Text(
                   label,
                   style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary),
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -575,8 +879,11 @@ class _HelpContactRow extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.open_in_new,
-              size: 16, color: AppColors.textSecondary),
+          const Icon(
+            Icons.open_in_new,
+            size: 16,
+            color: AppColors.textSecondary,
+          ),
         ],
       ),
     );
@@ -612,8 +919,10 @@ class _MenuItem extends StatelessWidget {
               color: color ?? AppColors.textPrimary,
             ),
           ),
-          trailing: Icon(Icons.chevron_right,
-              color: color ?? AppColors.textSecondary),
+          trailing: Icon(
+            Icons.chevron_right,
+            color: color ?? AppColors.textSecondary,
+          ),
           onTap: onTap,
         ),
         if (showDivider)

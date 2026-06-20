@@ -48,5 +48,11 @@ extension TripPhaseProperties on TripPhase {
   bool get isGpsMode =>
       this == TripPhase.navigatingToClient || this == TripPhase.tripInProgress;
 
+  // Publica localização também quando aguardando o passageiro no local
+  bool get isPublishingGps =>
+      this == TripPhase.navigatingToClient ||
+      this == TripPhase.arrivedAtClient ||
+      this == TripPhase.tripInProgress;
+
   bool get isActive => this != TripPhase.tripCompleted;
 }

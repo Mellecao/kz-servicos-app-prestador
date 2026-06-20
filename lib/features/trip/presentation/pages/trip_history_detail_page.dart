@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/constants/map_styles.dart';
+import 'package:kz_servicos_prestador/core/maps/kz_map.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/features/trip/data/services/directions_service.dart';
 
@@ -86,7 +87,7 @@ class _TripHistoryDetailPageState extends State<TripHistoryDetailPage> {
               borderRadius: BorderRadius.circular(16),
               child: SizedBox(
                 height: 200,
-                child: GoogleMap(
+                child: KzMap(
                   initialCameraPosition: CameraPosition(
                     target: LatLng(
                       (origin.latitude + destination.latitude) / 2,
@@ -116,7 +117,6 @@ class _TripHistoryDetailPageState extends State<TripHistoryDetailPage> {
                   tiltGesturesEnabled: false,
                   myLocationEnabled: false,
                   myLocationButtonEnabled: false,
-                  mapToolbarEnabled: false,
                   onMapCreated: (controller) {
                     Future.delayed(
                       const Duration(milliseconds: 300),
@@ -282,21 +282,19 @@ class _TripHistoryDetailPageState extends State<TripHistoryDetailPage> {
         _ => Icons.payment,
       };
 
-  void _fitMap(GoogleMapController c, LatLng o, LatLng d) {
-    c.animateCamera(
-      CameraUpdate.newLatLngBounds(
-        LatLngBounds(
-          southwest: LatLng(
-            o.latitude < d.latitude ? o.latitude : d.latitude,
-            o.longitude < d.longitude ? o.longitude : d.longitude,
-          ),
-          northeast: LatLng(
-            o.latitude > d.latitude ? o.latitude : d.latitude,
-            o.longitude > d.longitude ? o.longitude : d.longitude,
-          ),
+  void _fitMap(KzMapController c, LatLng o, LatLng d) {
+    c.fitBounds(
+      LatLngBounds(
+        southwest: LatLng(
+          o.latitude < d.latitude ? o.latitude : d.latitude,
+          o.longitude < d.longitude ? o.longitude : d.longitude,
         ),
-        40,
+        northeast: LatLng(
+          o.latitude > d.latitude ? o.latitude : d.latitude,
+          o.longitude > d.longitude ? o.longitude : d.longitude,
+        ),
       ),
+      padding: 40,
     );
   }
 }

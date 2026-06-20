@@ -4,9 +4,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/constants/map_styles.dart';
+import 'package:kz_servicos_prestador/core/maps/kz_map.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
+import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
 import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 class ScheduleDetailPage extends StatefulWidget {
   final TripData trip;
@@ -29,6 +32,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
   bool _observationError = false;
   bool _isLoading = false;
   final _tripService = TripService();
+  RealtimeChannel? _tripChannel;
 
   TripData get _trip => widget.trip;
 
@@ -38,13 +42,52 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
       ? _trip.canDriverRespond
       : _trip.status == 'awaiting_driver_confirmation';
 
+  bool get _isDriverRecheck => _trip.status == 'awaiting_driver_confirmation';
+
   String get _pageTitle =>
       widget.fromHome ? 'Detalhes da corrida' : 'Detalhes do agendamento';
 
   @override
+  void initState() {
+    super.initState();
+    _subscribeToTripCancellation();
+  }
+
+  @override
   void dispose() {
+    _tripChannel?.unsubscribe();
     _observationController.dispose();
     super.dispose();
+  }
+
+  void _subscribeToTripCancellation() {
+    _tripChannel = Supabase.instance.client
+        .channel('schedule-detail-${_trip.tripId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'trips',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: _trip.tripId,
+          ),
+          callback: (payload) {
+            if (payload.eventType == PostgresChangeEvent.delete ||
+                payload.newRecord['status'] == 'cancelled') {
+              _handleRemoteCancellation();
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  void _handleRemoteCancellation() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Esta corrida foi cancelada pela KZ.')),
+    );
+    context.go('/home');
   }
 
   Future<void> _accept() async {
@@ -54,8 +97,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
     if (_trip.status == 'searching_drivers') {
       ok = await _tripService.acceptAvailableTrip(
         _trip.tripId,
-        // providerProfileId used as driverProfileId in the DB update
-        _trip.tripId, // placeholder — real call uses AuthState
+        AuthState.driverProfileId ?? '',
       );
     } else {
       ok = await _tripService.confirmScheduledTrip(
@@ -71,7 +113,13 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'Corrida aceita com sucesso!' : 'Erro ao aceitar corrida'),
+        content: Text(
+          ok
+              ? (_isDriverRecheck
+                    ? 'Agendamento confirmado!'
+                    : 'Corrida aceita com sucesso!')
+              : 'Erro ao aceitar corrida',
+        ),
         backgroundColor: ok ? const Color(0xFF2ECC71) : Colors.red.shade400,
       ),
     );
@@ -94,6 +142,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
     final ok = await _tripService.rejectTrip(
       _trip.tripId,
       _observationController.text.trim(),
+      driverProfileId: AuthState.driverProfileId,
     );
 
     if (!mounted) return;
@@ -149,7 +198,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
                     borderRadius: BorderRadius.circular(16),
                     child: SizedBox(
                       height: 180,
-                      child: GoogleMap(
+                      child: KzMap(
                         initialCameraPosition: CameraPosition(
                           target: LatLng(
                             (origin.latitude + dest.latitude) / 2,
@@ -187,6 +236,45 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
 
                   _StatusChip(trip: _trip),
                   const SizedBox(height: 16),
+
+                  if (_isDriverRecheck) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(
+                            0xFFF97316,
+                          ).withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.event_available_outlined,
+                            size: 20,
+                            color: Color(0xFFF97316),
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'O passageiro aprovou a viagem. Você confirma o agendamento?',
+                              style: TextStyle(
+                                fontFamily: 'QuasimodoSemiBold',
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
                   _SectionCard(
                     title: 'Cliente',
@@ -234,8 +322,10 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
                           _InfoRow(
                             label: 'Detalhes',
                             value: _trip.children
-                                .map((c) =>
-                                    '${c.age} anos${c.needsCarSeat ? ' (cadeirinha)' : ''}')
+                                .map(
+                                  (c) =>
+                                      '${c.age} anos${c.needsCarSeat ? ' (cadeirinha)' : ''}',
+                                )
                                 .join(', '),
                           ),
                       ],
@@ -409,6 +499,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
       clientName: _trip.clientName,
       clientId: _trip.clientId,
       clientPhone: _trip.clientPhone,
+      clientAvatarUrl: _trip.clientAvatarUrl,
       pickupAddress: _trip.origin,
       destinationAddress: _trip.destination,
       pickupLat: _trip.originLat,
@@ -419,16 +510,23 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
       offeredPrice: _trip.price,
       paymentMethod: _trip.paymentMethod,
       scheduledAt: _trip.scheduledAt,
+      status: 'started',
     );
     if (!mounted) return;
-    context.push('/active-trip', extra: activeTripData);
+    context.go(
+      '/active-trip?tripId=${Uri.encodeComponent(_trip.tripId)}',
+      extra: activeTripData,
+    );
   }
 
   Widget _buildStartBar() {
     final phone = _trip.clientPhone;
     return Container(
       padding: EdgeInsets.fromLTRB(
-        24, 16, 24, MediaQuery.of(context).padding.bottom + 16,
+        24,
+        16,
+        24,
+        MediaQuery.of(context).padding.bottom + 16,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -454,7 +552,9 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
                   );
                   if (!ok && mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Não foi possível iniciar a ligação.')),
+                      const SnackBar(
+                        content: Text('Não foi possível iniciar a ligação.'),
+                      ),
                     );
                   }
                 },
@@ -489,12 +589,16 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white,
+                          strokeWidth: 2,
+                          color: Colors.white,
                         ),
                       )
                     : const Text(
                         'Iniciar corrida',
-                        style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 15),
+                        style: TextStyle(
+                          fontFamily: 'OutfitBlack',
+                          fontSize: 15,
+                        ),
                       ),
               ),
             ),
@@ -566,10 +670,12 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage> {
                           color: Colors.white,
                         ),
                       )
-                    : const Text(
-                        'Aceitar',
-                        style: TextStyle(
-                            fontFamily: 'OutfitBlack', fontSize: 15),
+                    : Text(
+                        _isDriverRecheck ? 'Confirmar agendamento' : 'Aceitar',
+                        style: const TextStyle(
+                          fontFamily: 'OutfitBlack',
+                          fontSize: 15,
+                        ),
                       ),
               ),
             ),
@@ -585,12 +691,12 @@ class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.trip});
 
   Color get _color => switch (trip.status) {
-        'awaiting_client_confirmation' => Colors.orange,
-        'awaiting_driver_confirmation' => AppColors.secondary,
-        'scheduled' => const Color(0xFF2ECC71),
-        'searching_drivers' => AppColors.secondary,
-        _ => AppColors.textSecondary,
-      };
+    'awaiting_client_confirmation' => Colors.orange,
+    'awaiting_driver_confirmation' => const Color(0xFFF97316),
+    'scheduled' => const Color(0xFF2ECC71),
+    'searching_drivers' => AppColors.secondary,
+    _ => AppColors.textSecondary,
+  };
 
   @override
   Widget build(BuildContext context) {

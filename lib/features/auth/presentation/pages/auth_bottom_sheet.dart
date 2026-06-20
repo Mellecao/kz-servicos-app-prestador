@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/services/auth_service.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
+import 'package:kz_servicos_prestador/core/services/push_notification_service.dart';
 import 'package:kz_servicos_prestador/features/auth/presentation/pages/login_page.dart';
 import 'package:kz_servicos_prestador/features/profile/data/models/mock_provider.dart';
 
@@ -51,16 +52,14 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
       prefixIcon: Icon(icon, color: Colors.grey[400], size: 20),
       filled: true,
       fillColor: const Color(0xFFF7F7F8),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide:
-            const BorderSide(color: AppColors.highlight, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.highlight, width: 1.5),
       ),
     );
   }
@@ -69,26 +68,26 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
     if (_mode == AuthMode.login) {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
-      
+
       if (email.isEmpty || password.isEmpty) {
         setState(() => _loginError = 'Preencha todos os campos');
         return;
       }
-      
+
       setState(() {
         _isLoading = true;
         _loginError = null;
       });
-      
+
       try {
         final result = await _authService.login(
           email: email,
           password: password,
         );
-        
+
         if (mounted) {
           setState(() => _isLoading = false);
-          
+
           if (result.isSuccess) {
             AuthState.login(
               providerType: result.providerType!,
@@ -98,6 +97,8 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
               providerProfileId: result.providerProfileId!,
               driverProfileId: result.driverProfileId,
             );
+            await PushNotificationService.registerDeviceTokenForCurrentUser();
+            if (!mounted) return;
             Navigator.of(context).pop();
             widget.onLoginSuccess(result.providerType!);
           } else {
@@ -119,24 +120,22 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
   }
 
   String get _title => switch (_mode) {
-        AuthMode.login => 'Login',
-        AuthMode.forgotPassword => 'Recuperar senha',
-        _ => 'Login',
-      };
+    AuthMode.login => 'Login',
+    AuthMode.forgotPassword => 'Recuperar senha',
+    _ => 'Login',
+  };
 
   String get _subtitle => switch (_mode) {
-        AuthMode.login => 'Acesse sua conta como prestador',
-        AuthMode.forgotPassword => 'Informe seu e-mail',
-        _ => 'Acesse sua conta',
-      };
+    AuthMode.login => 'Acesse sua conta como prestador',
+    AuthMode.forgotPassword => 'Informe seu e-mail',
+    _ => 'Acesse sua conta',
+  };
 
   String get _primaryLabel => switch (_mode) {
-        AuthMode.login => _isLoading ? 'Entrando...' : 'Login',
-        AuthMode.forgotPassword => 'Enviar e-mail',
-        _ => 'Login',
-      };
-
-
+    AuthMode.login => _isLoading ? 'Entrando...' : 'Login',
+    AuthMode.forgotPassword => 'Enviar e-mail',
+    _ => 'Login',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -171,7 +170,7 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
                 duration: const Duration(milliseconds: 250),
                 child: Column(
                   key: ValueKey(_mode),
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
                       _title,
@@ -197,8 +196,7 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration:
-                    _inputDecoration('E-mail', Icons.email_outlined),
+                decoration: _inputDecoration('E-mail', Icons.email_outlined),
               ),
 
               if (_mode != AuthMode.forgotPassword) ...[
@@ -206,21 +204,21 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
                 TextField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  decoration: _inputDecoration(
-                          'Senha', Icons.lock_outlined)
+                  decoration: _inputDecoration('Senha', Icons.lock_outlined)
                       .copyWith(
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        color: Colors.grey[400],
-                        size: 20,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: Colors.grey[400],
+                            size: 20,
+                          ),
+                          onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
+                        ),
                       ),
-                      onPressed: () => setState(
-                          () => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
                 ),
               ],
               if (_loginError != null) ...[
@@ -239,8 +237,8 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: GestureDetector(
-                    onTap: () => setState(
-                        () => _mode = AuthMode.forgotPassword),
+                    onTap: () =>
+                        setState(() => _mode = AuthMode.forgotPassword),
                     child: const Text(
                       'Esqueceu a senha?',
                       style: TextStyle(
@@ -265,7 +263,9 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     textStyle: const TextStyle(
-                        fontFamily: 'OutfitBlack', fontSize: 16),
+                      fontFamily: 'OutfitBlack',
+                      fontSize: 16,
+                    ),
                   ),
                   child: _isLoading
                       ? const SizedBox(
@@ -279,9 +279,7 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
                       : Text(_primaryLabel),
                 ),
               ),
-              if (_mode == AuthMode.forgotPassword)
-                const SizedBox(height: 20),
-
+              if (_mode == AuthMode.forgotPassword) const SizedBox(height: 20),
             ],
           ),
         ),

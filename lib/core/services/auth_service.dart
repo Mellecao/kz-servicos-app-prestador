@@ -37,10 +37,13 @@ class AuthService {
       if (userResponse == null) {
         await _client.auth.signOut();
         debugPrint('[AuthService] ERRO: user não encontrado como provider');
-        return AuthResult.failure('Acesso negado. Apenas prestadores de serviço e motoristas podem acessar.');
+        return AuthResult.failure(
+          'Acesso negado. Apenas prestadores de serviço e motoristas podem acessar.',
+        );
       }
 
-      final providerProfile = userResponse['provider_profiles'] as Map<String, dynamic>?;
+      final providerProfile =
+          userResponse['provider_profiles'] as Map<String, dynamic>?;
 
       if (providerProfile == null) {
         await _client.auth.signOut();
@@ -53,15 +56,20 @@ class AuthService {
 
       if (status != 'approved') {
         await _client.auth.signOut();
-        return AuthResult.failure('Sua conta ainda está pendente de aprovação.');
+        return AuthResult.failure(
+          'Sua conta ainda está pendente de aprovação.',
+        );
       }
 
-      final driverProfile = providerProfile['driver_profiles'] as Map<String, dynamic>?;
+      final driverProfile =
+          providerProfile['driver_profiles'] as Map<String, dynamic>?;
       final isDriver = driverProfile != null;
 
       debugPrint('[AuthService] isDriver: $isDriver');
 
-      final providerType = isDriver ? ProviderType.driver : ProviderType.serviceProvider;
+      final providerType = isDriver
+          ? ProviderType.driver
+          : ProviderType.serviceProvider;
       final providerProfileId = providerProfile['id'] as String;
       final driverProfileId = driverProfile?['id'] as String?;
 
@@ -74,7 +82,9 @@ class AuthService {
         driverProfileId: driverProfileId,
       );
     } on AuthException catch (e) {
-      debugPrint('[AuthService] AuthException: ${e.message} | status: ${e.statusCode}');
+      debugPrint(
+        '[AuthService] AuthException: ${e.message} | status: ${e.statusCode}',
+      );
       return AuthResult.failure(_mapAuthError(e));
     } catch (e, stack) {
       debugPrint('[AuthService] Erro inesperado: $e');
@@ -84,7 +94,7 @@ class AuthService {
   }
 
   Future<AuthResult?> getCurrentUser() async {
-    final user = _client.auth.currentUser;
+    final user = await _restoreCurrentUser();
     debugPrint('[AuthService] getCurrentUser: ${user?.id}');
     if (user == null) return null;
 
@@ -101,16 +111,20 @@ class AuthService {
         return null;
       }
 
-      final providerProfile = userResponse['provider_profiles'] as Map<String, dynamic>?;
+      final providerProfile =
+          userResponse['provider_profiles'] as Map<String, dynamic>?;
 
       if (providerProfile == null || providerProfile['status'] != 'approved') {
         await _client.auth.signOut();
         return null;
       }
 
-      final driverProfile = providerProfile['driver_profiles'] as Map<String, dynamic>?;
+      final driverProfile =
+          providerProfile['driver_profiles'] as Map<String, dynamic>?;
       final isDriver = driverProfile != null;
-      final providerType = isDriver ? ProviderType.driver : ProviderType.serviceProvider;
+      final providerType = isDriver
+          ? ProviderType.driver
+          : ProviderType.serviceProvider;
 
       return AuthResult.success(
         providerType: providerType,
@@ -123,6 +137,43 @@ class AuthService {
     } catch (e) {
       debugPrint('[AuthService] getCurrentUser erro: $e');
       await _client.auth.signOut();
+      return null;
+    }
+  }
+
+  Future<User?> _restoreCurrentUser() async {
+    final currentSession = _client.auth.currentSession;
+    if (currentSession != null) {
+      return _validUserFromSession(currentSession);
+    }
+
+    try {
+      final authState = await _client.auth.onAuthStateChange
+          .firstWhere(
+            (state) =>
+                state.event == AuthChangeEvent.initialSession ||
+                state.event == AuthChangeEvent.signedIn ||
+                state.event == AuthChangeEvent.signedOut,
+          )
+          .timeout(const Duration(seconds: 5));
+
+      final restoredSession = authState.session ?? _client.auth.currentSession;
+      if (restoredSession == null) return null;
+      return _validUserFromSession(restoredSession);
+    } catch (e) {
+      debugPrint('[AuthService] restore session timeout/erro: $e');
+      return _client.auth.currentUser;
+    }
+  }
+
+  Future<User?> _validUserFromSession(Session session) async {
+    if (!session.isExpired) return session.user;
+
+    try {
+      final refreshed = await _client.auth.refreshSession();
+      return refreshed.session?.user ?? _client.auth.currentUser;
+    } catch (e) {
+      debugPrint('[AuthService] refresh session erro: $e');
       return null;
     }
   }
@@ -186,9 +237,6 @@ class AuthResult {
   }
 
   factory AuthResult.failure(String message) {
-    return AuthResult._(
-      isSuccess: false,
-      errorMessage: message,
-    );
+    return AuthResult._(isSuccess: false, errorMessage: message);
   }
 }

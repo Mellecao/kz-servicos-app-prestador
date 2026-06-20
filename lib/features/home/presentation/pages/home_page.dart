@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/constants/map_styles.dart';
+import 'package:kz_servicos_prestador/core/maps/kz_map.dart';
+import 'package:kz_servicos_prestador/core/maps/route_polyline_builder.dart';
 import 'package:kz_servicos_prestador/core/widgets/provider_bottom_nav.dart';
 import 'package:kz_servicos_prestador/features/home/presentation/widgets/online_toggle.dart';
 import 'package:kz_servicos_prestador/features/home/presentation/widgets/scheduled_trips_carousel.dart';
@@ -15,10 +17,14 @@ import 'package:kz_servicos_prestador/features/home/presentation/widgets/trip_re
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/driver_service.dart';
+import 'package:kz_servicos_prestador/core/services/trip_chat_service.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
+import 'package:kz_servicos_prestador/features/home/domain/home_realtime_reload_policy.dart';
 import 'package:kz_servicos_prestador/features/trip/data/services/directions_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:kz_servicos_prestador/core/services/trip_audio_service.dart';
+
+const double _driverDefaultZoom = 17.5;
 
 class HomePage extends StatefulWidget {
   final ValueChanged<int> onNavTap;
@@ -29,20 +35,21 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
-    with TickerProviderStateMixin {
-  GoogleMapController? _mapController;
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+  KzMapController? _mapController;
   bool _isOnline = false;
   bool _showRequest = false;
   Timer? _requestTimer;
   final _tripService = TripService();
   final _driverService = DriverService();
+  final _chatService = TripChatService();
   List<TripData> _requests = [];
   int _currentRequestIndex = 0;
   Set<Polyline> _polylines = {};
   Set<Marker> _markers = {};
   final DirectionsService _directionsService = DirectionsService();
   final TripAudioService _tripAudio = TripAudioService();
+  int _routeRequestSerial = 0;
 
   LatLng _currentLocation = const LatLng(-23.5505, -46.6333);
   bool _locationLoaded = false;
@@ -63,11 +70,11 @@ class _HomePageState extends State<HomePage>
   double? _msgIconTop;
 
   RealtimeChannel? _invitationsChannel;
+  RealtimeChannel? _driverTripsChannel;
+  RealtimeChannel? _chatMessagesChannel;
+  int _totalUnreadMessages = 0;
 
   TripData get _currentRequest => _requests[_currentRequestIndex];
-
-  // Unread messages — driven by real chat later
-  int get _totalUnreadMessages => 0;
 
   @override
   void initState() {
@@ -75,6 +82,7 @@ class _HomePageState extends State<HomePage>
     _initLocation();
     _initIcons();
     _load().then((_) => _subscribeToInvitations());
+    _loadUnreadMessages().then((_) => _subscribeToChatMessages());
     AuthState.scheduledTrips?.addListener(_onScheduledTripsChanged);
   }
 
@@ -83,14 +91,20 @@ class _HomePageState extends State<HomePage>
     final driverProfileId = AuthState.driverProfileId;
     debugPrint('[HomePage] _load — driverProfileId: $driverProfileId');
     if (driverProfileId == null) {
-      debugPrint('[HomePage] driverProfileId é null — usuário não é motorista ou sessão não restaurou esse campo');
+      debugPrint(
+        '[HomePage] driverProfileId é null — usuário não é motorista ou sessão não restaurou esse campo',
+      );
       return;
     }
 
     final profileFuture = _driverService.getDriverProfile(userId ?? '');
-    final tripsFuture = _tripService.getDriverInvitations(driverProfileId);
+    final tripsFuture = Future.wait([
+      _tripService.getDriverRecheckRequests(driverProfileId),
+      _tripService.getDriverInvitations(driverProfileId),
+    ]);
     final profile = await profileFuture;
-    final trips = await tripsFuture;
+    final tripResults = await tripsFuture;
+    final trips = [...tripResults[0], ...tripResults[1]];
 
     if (!mounted) return;
 
@@ -98,16 +112,17 @@ class _HomePageState extends State<HomePage>
     setState(() => _isOnline = isAvailable);
 
     debugPrint('[HomePage] convites recebidos: ${trips.length}');
-    if (trips.isNotEmpty) {
-      setState(() {
-        _requests = trips;
-        _currentRequestIndex = 0;
-        _showRequest = isAvailable;
-      });
-      if (isAvailable) {
-        _fetchRouteForCurrentRequest();
-        _tripAudio.playNotificationLoop();
-      }
+    setState(() {
+      _requests = trips;
+      _currentRequestIndex = 0;
+      _showRequest = trips.isNotEmpty && isAvailable;
+    });
+
+    if (trips.isNotEmpty && isAvailable) {
+      _fetchRouteForCurrentRequest();
+      _tripAudio.playNotificationLoop();
+    } else {
+      _tripAudio.stopNotification();
     }
   }
 
@@ -120,6 +135,8 @@ class _HomePageState extends State<HomePage>
     _stopPulseAnimation();
     _requestTimer?.cancel();
     _invitationsChannel?.unsubscribe();
+    _driverTripsChannel?.unsubscribe();
+    _chatMessagesChannel?.unsubscribe();
     _tripAudio.stopNotification();
     unawaited(_tripAudio.dispose());
     AuthState.scheduledTrips?.removeListener(_onScheduledTripsChanged);
@@ -135,14 +152,61 @@ class _HomePageState extends State<HomePage>
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'trip_driver_candidates',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'driver_profile_id',
-            value: driverProfileId,
-          ),
-          callback: (_) => _load(),
+          callback: (payload) {
+            if (HomeRealtimeReloadPolicy.candidateChangeTargetsDriver(
+              driverProfileId: driverProfileId,
+              newRecord: payload.newRecord,
+              oldRecord: payload.oldRecord,
+            )) {
+              unawaited(_load());
+            }
+          },
         )
         .subscribe();
+
+    _driverTripsChannel = Supabase.instance.client
+        .channel('driver-trip-updates-$driverProfileId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'trips',
+          callback: (payload) {
+            if (HomeRealtimeReloadPolicy.tripChangeTargetsDriver(
+              driverProfileId: driverProfileId,
+              newRecord: payload.newRecord,
+              oldRecord: payload.oldRecord,
+            )) {
+              unawaited(_load());
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  void _subscribeToChatMessages() {
+    _chatMessagesChannel?.unsubscribe();
+    final userId = AuthState.userId;
+    if (userId == null) return;
+    _chatMessagesChannel = Supabase.instance.client
+        .channel('driver-chat-messages-$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'chat_messages',
+          callback: (_) => _loadUnreadMessages(playSoundOnIncrease: true),
+        )
+        .subscribe();
+  }
+
+  Future<void> _loadUnreadMessages({bool playSoundOnIncrease = false}) async {
+    final userId = AuthState.userId;
+    if (userId == null) return;
+    final count = await _chatService.countUnreadForProvider(userId);
+    if (!mounted) return;
+    if (playSoundOnIncrease && count > _totalUnreadMessages) {
+      unawaited(_tripAudio.playAccept());
+    }
+    setState(() => _totalUnreadMessages = count);
   }
 
   void _showNextRequest() {
@@ -176,9 +240,7 @@ class _HomePageState extends State<HomePage>
         _locationLoaded = true;
       });
       _updateDriverMarker();
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLngZoom(_currentLocation, 15),
-      );
+      _resetDriverMapView();
     } catch (_) {
       // Use default São Paulo position
     }
@@ -207,6 +269,7 @@ class _HomePageState extends State<HomePage>
       _showRequest = false;
       _polylines = {};
       _markers = {};
+      _routeRequestSerial++;
     });
     _tripAudio.stopNotification();
     _stopPulseAnimation();
@@ -221,11 +284,18 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _fetchRouteForCurrentRequest() async {
+    final serial = ++_routeRequestSerial;
     final r = _currentRequest;
     final pickup = LatLng(r.originLat, r.originLng);
     final destination = LatLng(r.destinationLat, r.destinationLng);
 
-    // Fetch both routes in parallel
+    _showRequestRoutePreview(
+      pickup: pickup,
+      destination: destination,
+      tripPoints: const [],
+    );
+    _fitAllBounds(pickup, destination);
+
     final results = await Future.wait([
       _directionsService.fetchRoute(origin: pickup, destination: destination),
       _directionsService.fetchRoute(
@@ -234,81 +304,79 @@ class _HomePageState extends State<HomePage>
       ),
     ]);
 
+    if (!mounted || _requests.isEmpty || serial != _routeRequestSerial) return;
+
     final tripPoints = results[0].polyline;
-    final driverToPickupPoints = results[1].polyline;
+    _showRequestRoutePreview(
+      pickup: pickup,
+      destination: destination,
+      tripPoints: tripPoints,
+      driverToPickupPoints: results[1].polyline,
+    );
+  }
 
-    if (!mounted) return;
-
-    // Build markers
+  void _showRequestRoutePreview({
+    required LatLng pickup,
+    required LatLng destination,
+    required List<LatLng> tripPoints,
+    List<LatLng> driverToPickupPoints = const [],
+  }) {
     final markers = <Marker>{};
     if (_driverLocationIcon != null) {
-      markers.add(Marker(
-        markerId: const MarkerId('driver_location'),
-        position: _currentLocation,
-        icon: _driverLocationIcon!,
-        anchor: const Offset(0.5, 0.5),
-        zIndexInt: 10,
-      ));
+      markers.add(
+        Marker(
+          markerId: const MarkerId('driver_location'),
+          position: _currentLocation,
+          icon: _driverLocationIcon!,
+          anchor: const Offset(0.5, 0.5),
+          zIndexInt: 10,
+        ),
+      );
     }
     if (_yellowPinIcon != null) {
-      markers.add(Marker(
-        markerId: const MarkerId('pickup'),
-        position: pickup,
-        icon: _yellowPinIcon!,
-      ));
+      markers.add(
+        Marker(
+          markerId: const MarkerId('pickup'),
+          position: pickup,
+          icon: _yellowPinIcon!,
+        ),
+      );
     }
     if (_yellowCircleIcon != null) {
-      markers.add(Marker(
-        markerId: const MarkerId('destination'),
-        position: destination,
-        icon: _yellowCircleIcon!,
-      ));
+      markers.add(
+        Marker(
+          markerId: const MarkerId('destination'),
+          position: destination,
+          icon: _yellowCircleIcon!,
+        ),
+      );
     }
 
-    // Build polylines
     final polylines = <Polyline>{};
-
-    // Driver → pickup route (subtle blue)
     if (driverToPickupPoints.isNotEmpty) {
-      polylines.add(Polyline(
-        polylineId: const PolylineId('driver_route'),
-        points: driverToPickupPoints,
-        color: AppColors.secondary.withValues(alpha: 0.4),
-        width: 3,
-      ));
+      polylines.add(
+        Polyline(
+          polylineId: const PolylineId('driver_route'),
+          points: driverToPickupPoints,
+          color: AppColors.secondary.withValues(alpha: 0.4),
+          width: 3,
+        ),
+      );
     }
-
-    // Trip route base (pickup → destination)
     if (tripPoints.isNotEmpty) {
-      polylines.addAll({
-        Polyline(
-          polylineId: const PolylineId('route_glow'),
-          points: tripPoints,
-          color: AppColors.highlight.withValues(alpha: 0.18),
-          width: 10,
-        ),
-        Polyline(
-          polylineId: const PolylineId('route'),
-          points: tripPoints,
-          color: AppColors.highlight,
-          width: 4,
-        ),
-      });
+      polylines.addAll(RoutePolylineBuilder.yellowRoute(tripPoints));
     }
 
     setState(() {
       _markers = markers;
       _polylines = polylines;
-    });
-
-    // Start pulse animation on trip route
-    if (tripPoints.isNotEmpty) {
       _routePoints = tripPoints;
+    });
+    if (tripPoints.isNotEmpty) {
       _startPulseAnimation(tripPoints);
+    } else {
+      _stopPulseAnimation();
     }
-
-    // Fit bounds to include all points
-    _fitAllBounds(pickup, destination);
   }
 
   // ── Pulse animation (same as client app) ──
@@ -317,8 +385,7 @@ class _HomePageState extends State<HomePage>
     _stopPulseAnimation();
     if (points.length < 2) return;
     _routeDistances = _computeSegmentDistances(points);
-    _routeTotalLength =
-        _routeDistances.isEmpty ? 0 : _routeDistances.last;
+    _routeTotalLength = _routeDistances.isEmpty ? 0 : _routeDistances.last;
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3000),
@@ -345,7 +412,8 @@ class _HomePageState extends State<HomePage>
     const r = 6371000.0;
     final dLat = _toRad(b.latitude - a.latitude);
     final dLon = _toRad(b.longitude - a.longitude);
-    final hav = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final hav =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(_toRad(a.latitude)) *
             math.cos(_toRad(b.latitude)) *
             math.sin(dLon / 2) *
@@ -401,9 +469,8 @@ class _HomePageState extends State<HomePage>
     if (clampedHead - clampedTail < 1) {
       setState(() {
         _polylines = {
-          ..._polylines.where((p) =>
-              p.polylineId.value != 'pulse_glow' &&
-              p.polylineId.value != 'pulse_core'),
+          ..._polylines.where((p) => p.polylineId.value == 'driver_route'),
+          ...RoutePolylineBuilder.yellowRoute(_routePoints),
         };
       });
       return;
@@ -414,23 +481,12 @@ class _HomePageState extends State<HomePage>
 
     setState(() {
       _polylines = {
-        ..._polylines.where((p) =>
-            p.polylineId.value != 'pulse_glow' &&
-            p.polylineId.value != 'pulse_core'),
-        if (glowPoints.length >= 2)
-          Polyline(
-            polylineId: const PolylineId('pulse_glow'),
-            points: glowPoints,
-            color: Colors.white.withValues(alpha: 0.45 * fadeFactor),
-            width: 12,
-          ),
-        if (glowPoints.length >= 2)
-          Polyline(
-            polylineId: const PolylineId('pulse_core'),
-            points: glowPoints,
-            color: Colors.white.withValues(alpha: 0.85 * fadeFactor),
-            width: 5,
-          ),
+        ..._polylines.where((p) => p.polylineId.value == 'driver_route'),
+        ...RoutePolylineBuilder.yellowPulsingRoute(
+          routePoints: _routePoints,
+          pulsePoints: glowPoints,
+          fadeFactor: fadeFactor,
+        ),
       };
     });
   }
@@ -458,13 +514,13 @@ class _HomePageState extends State<HomePage>
       ..close();
     canvas.drawPath(path, paint);
     canvas.drawCircle(
-      const Offset(width / 2, 14), 5, Paint()..color = Colors.white,
+      const Offset(width / 2, 14),
+      5,
+      Paint()..color = Colors.white,
     );
     final picture = recorder.endRecording();
     final image = await picture.toImage(width.toInt(), height.toInt());
-    final byteData = await image.toByteData(
-      format: ui.ImageByteFormat.png,
-    );
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
   }
 
@@ -489,9 +545,7 @@ class _HomePageState extends State<HomePage>
     );
     final picture = recorder.endRecording();
     final image = await picture.toImage(size.toInt(), size.toInt());
-    final byteData = await image.toByteData(
-      format: ui.ImageByteFormat.png,
-    );
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
   }
 
@@ -519,9 +573,7 @@ class _HomePageState extends State<HomePage>
     );
     final picture = recorder.endRecording();
     final image = await picture.toImage(size.toInt(), size.toInt());
-    final byteData = await image.toByteData(
-      format: ui.ImageByteFormat.png,
-    );
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
   }
 
@@ -540,39 +592,45 @@ class _HomePageState extends State<HomePage>
       if (p.longitude < minLng) minLng = p.longitude;
       if (p.longitude > maxLng) maxLng = p.longitude;
     }
-    _mapController!.animateCamera(
-      CameraUpdate.newLatLngBounds(
-        LatLngBounds(
-          southwest: LatLng(minLat, minLng),
-          northeast: LatLng(maxLat, maxLng),
-        ),
-        80,
+    _mapController!.fitBounds(
+      LatLngBounds(
+        southwest: LatLng(minLat, minLng),
+        northeast: LatLng(maxLat, maxLng),
       ),
+      padding: 80,
     );
   }
 
-  Future<void> _onAccept(double price) async {
+  Future<void> _onAccept(double? price) async {
     final driverProfileId = AuthState.driverProfileId;
     if (driverProfileId == null) return;
     _tripAudio.stopNotification();
     unawaited(_tripAudio.playAccept());
     final request = _requests[_currentRequestIndex];
-    final ok = await _tripService.acceptCandidate(
-      request.tripId,
-      driverProfileId,
-      offeredPrice: price,
-    );
+    final ok = request.status == 'awaiting_driver_confirmation'
+        ? await _tripService.confirmScheduledTrip(request.tripId, null)
+        : await _tripService.acceptCandidate(
+            request.tripId,
+            driverProfileId,
+            offeredPrice: price,
+          );
     if (!mounted) return;
     if (!ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Não foi possível aceitar a solicitação.')),
+        const SnackBar(
+          content: Text('Não foi possível aceitar a solicitação.'),
+        ),
       );
       return;
     }
     _stopPulseAnimation();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Solicitação aceita! Acompanhe em Agendamentos.'),
+      SnackBar(
+        content: Text(
+          request.status == 'awaiting_driver_confirmation'
+              ? 'Agendamento confirmado!'
+              : 'Solicitação aceita! Acompanhe em Agendamentos.',
+        ),
         backgroundColor: Color(0xFF2ECC71),
       ),
     );
@@ -586,15 +644,23 @@ class _HomePageState extends State<HomePage>
     final driverProfileId = AuthState.driverProfileId;
     if (driverProfileId == null) return;
     final trip = _requests[_currentRequestIndex];
-    final ok = await _tripService.rejectCandidate(
-      trip.tripId,
-      driverProfileId,
-      observation: observation.isEmpty ? null : observation,
-    );
+    final ok = trip.status == 'awaiting_driver_confirmation'
+        ? await _tripService.rejectTrip(
+            trip.tripId,
+            observation,
+            driverProfileId: driverProfileId,
+          )
+        : await _tripService.rejectCandidate(
+            trip.tripId,
+            driverProfileId,
+            observation: observation.isEmpty ? null : observation,
+          );
     if (!mounted) return;
     if (!ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Não foi possível recusar a solicitação.')),
+        const SnackBar(
+          content: Text('Não foi possível recusar a solicitação.'),
+        ),
       );
       return;
     }
@@ -603,17 +669,29 @@ class _HomePageState extends State<HomePage>
   }
 
   void _advanceToNextRequest() {
-    final remaining = List<TripData>.from(_requests)..removeAt(_currentRequestIndex);
+    final remaining = List<TripData>.from(_requests)
+      ..removeAt(_currentRequestIndex);
     setState(() {
       _requests = remaining;
       _currentRequestIndex = 0;
       _showRequest = false;
       _polylines = {};
       _markers = {};
+      _routeRequestSerial++;
     });
     if (_requests.isNotEmpty) {
       _showNextRequest();
+    } else {
+      _resetDriverMapView();
     }
+  }
+
+  void _resetDriverMapView() {
+    _updateDriverMarker();
+    _mapController?.animateTo(
+      target: _currentLocation,
+      zoom: _driverDefaultZoom,
+    );
   }
 
   Future<String?> _showRejectDialog() async {
@@ -675,17 +753,18 @@ class _HomePageState extends State<HomePage>
     return Scaffold(
       body: Stack(
         children: [
-          GoogleMap(
+          KzMap(
             initialCameraPosition: CameraPosition(
               target: _currentLocation,
-              zoom: 15,
+              zoom: _driverDefaultZoom,
             ),
             style: MapStyles.standard,
             onMapCreated: (controller) {
               _mapController = controller;
               if (_locationLoaded) {
-                controller.animateCamera(
-                  CameraUpdate.newLatLngZoom(_currentLocation, 15),
+                controller.animateTo(
+                  target: _currentLocation,
+                  zoom: _driverDefaultZoom,
                 );
               }
             },
@@ -694,7 +773,6 @@ class _HomePageState extends State<HomePage>
             myLocationEnabled: false,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
           ),
 
           // Online/Offline toggle
@@ -710,16 +788,28 @@ class _HomePageState extends State<HomePage>
             ),
           ),
 
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 72,
+            left: 16,
+            right: 16,
+            child: _buildHomeBanner(context),
+          ),
+
           // Status badge
           if (_isOnline && _showRequest)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 72,
+              top:
+                  MediaQuery.of(context).padding.top +
+                  88 +
+                  _homeBannerHeight(context),
               left: 0,
               right: 0,
               child: Center(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
@@ -778,18 +868,23 @@ class _HomePageState extends State<HomePage>
           // My location button
           Positioned(
             right: 16,
-            bottom: bottomPadding +
-                ((_showRequest && _requests.isNotEmpty) ? 320 :
-                 (AuthState.scheduledTrips?.trips.isNotEmpty ?? false) ? 260 : 100),
+            bottom:
+                bottomPadding +
+                ((_showRequest && _requests.isNotEmpty)
+                    ? 320
+                    : (AuthState.scheduledTrips?.trips.isNotEmpty ?? false)
+                    ? 260
+                    : 100),
             child: FloatingActionButton.small(
               heroTag: 'myLocation',
               backgroundColor: Colors.white,
               onPressed: () {
-                _mapController?.animateCamera(
-                  CameraUpdate.newLatLngZoom(_currentLocation, 15),
-                );
+                _resetDriverMapView();
               },
-              child: const Icon(Icons.my_location, color: AppColors.textPrimary),
+              child: const Icon(
+                Icons.my_location,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
 
@@ -797,7 +892,8 @@ class _HomePageState extends State<HomePage>
           if (_totalUnreadMessages > 0)
             Positioned(
               left: _msgIconLeft ?? MediaQuery.of(context).size.width - 52 - 24,
-              top: _msgIconTop ??
+              top:
+                  _msgIconTop ??
                   MediaQuery.of(context).size.height -
                       bottomPadding -
                       12 -
@@ -808,11 +904,12 @@ class _HomePageState extends State<HomePage>
                 onPanUpdate: (details) {
                   setState(() {
                     final screenSize = MediaQuery.of(context).size;
-                    _msgIconLeft = ((_msgIconLeft ??
-                                    screenSize.width - 52 - 24) +
+                    _msgIconLeft =
+                        ((_msgIconLeft ?? screenSize.width - 52 - 24) +
                                 details.delta.dx)
                             .clamp(0.0, screenSize.width - 52);
-                    _msgIconTop = ((_msgIconTop ??
+                    _msgIconTop =
+                        ((_msgIconTop ??
                                     screenSize.height -
                                         bottomPadding -
                                         12 -
@@ -821,8 +918,9 @@ class _HomePageState extends State<HomePage>
                                         16) +
                                 details.delta.dy)
                             .clamp(
-                                MediaQuery.of(context).padding.top,
-                                screenSize.height - 52 - bottomPadding);
+                              MediaQuery.of(context).padding.top,
+                              screenSize.height - 52 - bottomPadding,
+                            );
                   });
                 },
                 onTap: () => context.push('/messages'),
@@ -892,6 +990,33 @@ class _HomePageState extends State<HomePage>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  double _homeBannerHeight(BuildContext context) {
+    final width = MediaQuery.of(context).size.width - 32;
+    return (width / 3.19).clamp(88.0, 118.0);
+  }
+
+  Widget _buildHomeBanner(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => context.push('/benefits'),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            height: _homeBannerHeight(context),
+            width: double.infinity,
+            child: Image.asset(
+              'assets/images/banner.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+            ),
+          ),
+        ),
       ),
     );
   }

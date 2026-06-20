@@ -22,17 +22,23 @@ class LoginPage extends StatelessWidget {
     );
   }
 
-
-
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final shortestSide = size.shortestSide;
+    final isTablet = shortestSide >= 600;
+    final imageFit = isTablet ? BoxFit.contain : BoxFit.cover;
+    final imageAlignment = isTablet ? Alignment.topCenter : Alignment.center;
+
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Stack(
         fit: StackFit.expand,
         children: [
           Image.asset(
-            'assets/images/login_background_img.png',
-            fit: BoxFit.cover,
+            'assets/images/bg_login_prestador.png',
+            fit: imageFit,
+            alignment: imageAlignment,
           ),
           DecoratedBox(
             decoration: BoxDecoration(
@@ -51,9 +57,10 @@ class LoginPage extends StatelessWidget {
           Positioned(
             left: 0,
             right: 0,
-            bottom: MediaQuery.of(context).padding.bottom + 36,
+            bottom:
+                MediaQuery.of(context).padding.bottom + (isTablet ? 48 : 36),
             child: FractionallySizedBox(
-              widthFactor: 0.8,
+              widthFactor: isTablet ? 0.52 : 0.8,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -76,7 +83,6 @@ class LoginPage extends StatelessWidget {
                       child: const Text('Login'),
                     ),
                   ),
-
                 ],
               ),
             ),

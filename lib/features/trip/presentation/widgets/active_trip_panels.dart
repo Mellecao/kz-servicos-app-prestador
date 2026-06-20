@@ -5,22 +5,26 @@ import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data
 
 class ActiveTripPanel extends StatelessWidget {
   final String clientName;
+  final String? clientAvatarUrl;
   final String subtitle;
   final Color phaseColor;
   final String buttonLabel;
   final VoidCallback onAdvance;
   final VoidCallback onChat;
   final VoidCallback onCall;
+  final VoidCallback onReportProblem;
 
   const ActiveTripPanel({
     super.key,
     required this.clientName,
+    this.clientAvatarUrl,
     required this.subtitle,
     required this.phaseColor,
     required this.buttonLabel,
     required this.onAdvance,
     required this.onChat,
     required this.onCall,
+    required this.onReportProblem,
   });
 
   @override
@@ -44,17 +48,10 @@ class ActiveTripPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(
+              _ClientAvatar(
+                name: clientName,
+                avatarUrl: clientAvatarUrl,
                 radius: 24,
-                backgroundColor: AppColors.highlight.withValues(alpha: 0.15),
-                child: Text(
-                  clientName[0],
-                  style: const TextStyle(
-                    fontFamily: 'OutfitBlack',
-                    fontSize: 20,
-                    color: AppColors.highlight,
-                  ),
-                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -101,15 +98,66 @@ class ActiveTripPanel extends StatelessWidget {
               ),
               child: Text(
                 buttonLabel,
-                style: const TextStyle(
-                  fontFamily: 'OutfitBlack',
-                  fontSize: 16,
+                style: const TextStyle(fontFamily: 'OutfitBlack', fontSize: 16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              onPressed: onReportProblem,
+              icon: Icon(
+                Icons.cancel_outlined,
+                color: Colors.red.shade400,
+                size: 16,
+              ),
+              label: Text(
+                'Cancelar corrida',
+                style: TextStyle(
+                  color: Colors.red.shade400,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ClientAvatar extends StatelessWidget {
+  final String name;
+  final String? avatarUrl;
+  final double radius;
+
+  const _ClientAvatar({
+    required this.name,
+    required this.avatarUrl,
+    required this.radius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final url = avatarUrl?.trim();
+    final hasAvatar = url != null && url.isNotEmpty;
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: AppColors.highlight.withValues(alpha: 0.15),
+      backgroundImage: hasAvatar ? NetworkImage(url) : null,
+      onBackgroundImageError: hasAvatar ? (_, _) {} : null,
+      child: hasAvatar
+          ? null
+          : Text(
+              name.isNotEmpty ? name[0] : '?',
+              style: const TextStyle(
+                fontFamily: 'OutfitBlack',
+                fontSize: 20,
+                color: AppColors.highlight,
+              ),
+            ),
     );
   }
 }
@@ -205,8 +253,10 @@ class _TripCompletedPanelState extends State<TripCompletedPanel> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: AppColors.highlight, width: 1.5),
+                borderSide: const BorderSide(
+                  color: AppColors.highlight,
+                  width: 1.5,
+                ),
               ),
               contentPadding: const EdgeInsets.all(14),
             ),
@@ -214,7 +264,11 @@ class _TripCompletedPanelState extends State<TripCompletedPanel> {
           const SizedBox(height: 8),
           TextButton.icon(
             onPressed: widget.onReportProblem,
-            icon: Icon(Icons.flag_outlined, color: Colors.red.shade400, size: 18),
+            icon: Icon(
+              Icons.flag_outlined,
+              color: Colors.red.shade400,
+              size: 18,
+            ),
             label: Text(
               'Relatar um problema',
               style: TextStyle(
@@ -253,12 +307,16 @@ class ArrivedAtClientPanel extends StatelessWidget {
   final ActiveTripData trip;
   final VoidCallback onStart;
   final VoidCallback onCall;
+  final VoidCallback onChat;
+  final VoidCallback onReportProblem;
 
   const ArrivedAtClientPanel({
     super.key,
     required this.trip,
     required this.onStart,
     required this.onCall,
+    required this.onChat,
+    required this.onReportProblem,
   });
 
   @override
@@ -296,9 +354,33 @@ class ArrivedAtClientPanel extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          _ArrivedDetailRow(icon: Icons.person_outline, label: trip.clientName),
+          Row(
+            children: [
+              _ClientAvatar(
+                name: trip.clientName,
+                avatarUrl: trip.clientAvatarUrl,
+                radius: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  trip.clientName,
+                  style: const TextStyle(
+                    fontFamily: 'OutfitBlack',
+                    fontSize: 15,
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 6),
-          _ArrivedDetailRow(icon: Icons.flag_outlined, label: trip.destinationAddress),
+          _ArrivedDetailRow(
+            icon: Icons.flag_outlined,
+            label: trip.destinationAddress,
+          ),
           const SizedBox(height: 6),
           _ArrivedDetailRow(
             icon: Icons.people_outline,
@@ -312,6 +394,23 @@ class ArrivedAtClientPanel extends StatelessWidget {
           const SizedBox(height: 20),
           Row(
             children: [
+              SizedBox(
+                height: 52,
+                width: 52,
+                child: OutlinedButton(
+                  onPressed: onChat,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.secondary,
+                    side: BorderSide(color: AppColors.secondary, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                  child: const Icon(Icons.chat_outlined, size: 22),
+                ),
+              ),
+              const SizedBox(width: 10),
               if (trip.clientPhone != null && trip.clientPhone!.isNotEmpty) ...[
                 SizedBox(
                   height: 52,
@@ -320,7 +419,10 @@ class ArrivedAtClientPanel extends StatelessWidget {
                     onPressed: onCall,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF2ECC71),
-                      side: const BorderSide(color: Color(0xFF2ECC71), width: 1.5),
+                      side: const BorderSide(
+                        color: Color(0xFF2ECC71),
+                        width: 1.5,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -329,7 +431,7 @@ class ArrivedAtClientPanel extends StatelessWidget {
                     child: const Icon(Icons.phone_outlined, size: 22),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
               ],
               Expanded(
                 child: SizedBox(
@@ -352,6 +454,26 @@ class ArrivedAtClientPanel extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              onPressed: onReportProblem,
+              icon: Icon(
+                Icons.cancel_outlined,
+                color: Colors.red.shade400,
+                size: 16,
+              ),
+              label: Text(
+                'Cancelar corrida',
+                style: TextStyle(
+                  color: Colors.red.shade400,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -421,11 +543,17 @@ class PaymentCollectionPanel extends StatelessWidget {
           ),
           Text(
             'de $clientName',
-            style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
           ),
           Text(
             'pelo $paymentMethodLabel',
-            style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -466,10 +594,7 @@ class _ArrivedDetailRow extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textPrimary,
-            ),
+            style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
