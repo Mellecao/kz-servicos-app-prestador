@@ -5,6 +5,8 @@ import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
 import 'package:kz_servicos_prestador/core/widgets/provider_bottom_nav.dart';
+import 'package:kz_servicos_prestador/features/schedules/data/repositories/scheduled_direct_repository.dart';
+import 'package:kz_servicos_prestador/features/schedules/presentation/widgets/scheduled_direct_request_card.dart';
 import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
@@ -19,8 +21,10 @@ class SchedulesPage extends StatefulWidget {
 
 class _SchedulesPageState extends State<SchedulesPage> {
   final _tripService = TripService();
+  final _directRepo = ScheduledDirectRepository();
   List<TripData> _scheduledTrips = [];
   List<TripData> _invitationTrips = [];
+  List<Map<String, dynamic>> _directRequests = [];
   bool _loading = true;
   String _activeFilter = 'Todos';
   RealtimeChannel? _tripsChannel;
@@ -103,14 +107,44 @@ class _SchedulesPageState extends State<SchedulesPage> {
     final results = await Future.wait([
       _tripService.getDriverScheduledTrips(driverId),
       _tripService.getDriverAcceptedCandidacies(driverId),
+      _fetchDirectRequests(driverId),
     ]);
     if (mounted) {
       setState(() {
-        _scheduledTrips = results[0];
-        _invitationTrips = results[1];
+        _scheduledTrips = results[0] as List<TripData>;
+        _invitationTrips = results[1] as List<TripData>;
+        _directRequests = results[2] as List<Map<String, dynamic>>;
         _loading = false;
       });
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchDirectRequests(String driverId) async {
+    if (driverId.isEmpty) return const [];
+    final response = await Supabase.instance.client
+        .from('trip_driver_candidates')
+        .select('''
+          trip_id, status,
+          trips!inner (
+            id, client_id, trip_type, status,
+            pickup_address:pickup_address_id ( street, number, neighborhood ),
+            dropoff_address:dropoff_address_id ( street, number, neighborhood ),
+            users:client_id ( full_name )
+          )
+        ''')
+        .eq('driver_profile_id', driverId)
+        .eq('status', 'pending')
+        .eq('trips.trip_type', 'scheduled_choose_driver')
+        .eq('trips.status', 'awaiting_driver_confirmation') as List<dynamic>;
+    return response.whereType<Map<String, dynamic>>().toList();
+  }
+
+  String _formatAddr(dynamic addr) {
+    if (addr is! Map) return '—';
+    final street = addr['street'] ?? '';
+    final number = addr['number'] ?? '';
+    final neighborhood = addr['neighborhood'] ?? '';
+    return '$street, $number — $neighborhood';
   }
 
   Future<void> _startTrip(TripData trip) async {
@@ -198,7 +232,7 @@ class _SchedulesPageState extends State<SchedulesPage> {
                 Expanded(
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
-                      : items.isEmpty
+                      : (items.isEmpty && _directRequests.isEmpty)
                       ? const Center(
                           child: Text(
                             'Nenhum agendamento encontrado',
@@ -210,31 +244,51 @@ class _SchedulesPageState extends State<SchedulesPage> {
                         )
                       : RefreshIndicator(
                           onRefresh: _load,
-                          child: ListView.separated(
+                          child: ListView(
                             padding: EdgeInsets.fromLTRB(
                               24,
                               0,
                               24,
                               bottomPadding + 100,
                             ),
-                            itemCount: items.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (_, i) => GestureDetector(
-                              onTap: () => context.push(
-                                '/schedule-detail',
-                                extra: items[i],
-                              ),
-                              child: _ScheduleCard(
-                                trip: items[i],
-                                isHighlighted:
-                                    items[i].status == 'scheduled' &&
-                                    _activeFilter == 'Todos',
-                                onStartTrip: items[i].status == 'scheduled'
-                                    ? () => _startTrip(items[i])
-                                    : null,
-                              ),
-                            ),
+                            children: [
+                              ..._directRequests.map((row) {
+                                final trip = row['trips'] as Map<String, dynamic>;
+                                final client = trip['users'] as Map<String, dynamic>?;
+                                return ScheduledDirectRequestCard(
+                                  tripId: trip['id'] as String,
+                                  clientName: (client?['full_name'] as String?) ?? 'Cliente',
+                                  pickupAddress: _formatAddr(trip['pickup_address']),
+                                  dropoffAddress: _formatAddr(trip['dropoff_address']),
+                                  onAcceptWithPrice: (price) async {
+                                    await _directRepo.acceptWithPrice(trip['id'] as String, price);
+                                    await _load();
+                                  },
+                                  onReject: () async {
+                                    await _directRepo.reject(trip['id'] as String);
+                                    await _load();
+                                  },
+                                );
+                              }),
+                              ...items.map((item) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: GestureDetector(
+                                      onTap: () => context.push(
+                                        '/schedule-detail',
+                                        extra: item,
+                                      ),
+                                      child: _ScheduleCard(
+                                        trip: item,
+                                        isHighlighted:
+                                            item.status == 'scheduled' &&
+                                            _activeFilter == 'Todos',
+                                        onStartTrip: item.status == 'scheduled'
+                                            ? () => _startTrip(item)
+                                            : null,
+                                      ),
+                                    ),
+                                  )),
+                            ],
                           ),
                         ),
                 ),
