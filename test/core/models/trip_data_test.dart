@@ -98,6 +98,22 @@ void main() {
     });
   });
 
+  group('TripData.copyWith', () {
+    test('atualiza status mantendo demais campos', () {
+      final original = makeTrip(status: 'searching_drivers');
+
+      final updated = original.copyWith(
+        status: 'awaiting_driver_confirmation',
+        candidateStatus: 'accepted',
+      );
+
+      expect(updated.status, 'awaiting_driver_confirmation');
+      expect(updated.candidateStatus, 'accepted');
+      expect(updated.tripId, original.tripId);
+      expect(updated.clientName, original.clientName);
+    });
+  });
+
   group('TripData.fromMap()', () {
     final map = {
       'id': 'trip-1',
@@ -143,6 +159,20 @@ void main() {
         ..remove('candidate_status');
       final trip = TripData.fromMap(noCandStatus);
       expect(trip.candidateStatus, isNull);
+    });
+
+    test('tripType default é standard quando ausente', () {
+      final trip = TripData.fromMap(map);
+      expect(trip.tripType, 'standard');
+      expect(trip.isFlash, isFalse);
+    });
+
+    test('parseia trip_type=flash', () {
+      final flashMap = Map<String, dynamic>.from(map)
+        ..['trip_type'] = 'flash';
+      final trip = TripData.fromMap(flashMap);
+      expect(trip.tripType, 'flash');
+      expect(trip.isFlash, isTrue);
     });
   });
 }
