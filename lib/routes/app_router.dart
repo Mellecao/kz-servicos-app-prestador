@@ -5,11 +5,13 @@ import 'package:kz_servicos_prestador/core/services/auth_service.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
 import 'package:kz_servicos_prestador/core/widgets/circle_button.dart';
+import 'package:kz_servicos_prestador/core/widgets/service_provider_bottom_nav.dart';
 import 'package:kz_servicos_prestador/features/auth/presentation/pages/login_page.dart';
 import 'package:kz_servicos_prestador/features/benefits/presentation/pages/benefits_page.dart';
 import 'package:kz_servicos_prestador/core/services/trip_chat_service.dart';
 import 'package:kz_servicos_prestador/features/chat/presentation/pages/chat_page.dart';
 import 'package:kz_servicos_prestador/features/chat/presentation/pages/messages_page.dart';
+import 'package:kz_servicos_prestador/features/chat/presentation/pages/support_chat_page.dart';
 import 'package:kz_servicos_prestador/features/earnings/presentation/pages/earnings_page.dart';
 import 'package:kz_servicos_prestador/features/home/presentation/pages/home_page.dart';
 import 'package:kz_servicos_prestador/features/other_services/presentation/pages/provider_earnings_page.dart';
@@ -22,6 +24,11 @@ import 'package:kz_servicos_prestador/features/splash/presentation/pages/splash_
 import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/pages/active_trip_loader_page.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/pages/active_trip_page.dart';
+import 'package:kz_servicos_prestador/core/services/flash_trip_service.dart';
+import 'package:kz_servicos_prestador/features/trip/presentation/pages/flash_awaiting_client_page.dart';
+import 'package:kz_servicos_prestador/features/trip/presentation/pages/flash_incoming_call_page.dart';
+import 'package:kz_servicos_prestador/features/trip/presentation/pages/flash_recheck_page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:kz_servicos_prestador/features/trip/presentation/pages/trip_history_detail_page.dart';
 import 'package:kz_servicos_prestador/features/trip/presentation/pages/trip_history_page.dart';
 import 'package:kz_servicos_prestador/features/schedules/presentation/pages/schedules_page.dart';
@@ -58,8 +65,11 @@ class AppRouter {
       // Driver routes
       GoRoute(
         path: '/home',
-        builder: (context, state) =>
-            HomePage(onNavTap: (i) => _handleNavTap(context, state, i)),
+        builder: (context, state) => HomePage(
+          onNavTap: (i) => _handleNavTap(context, state, i),
+          tripRequestId: state.uri.queryParameters['tripRequestId'],
+          activeTripId: state.uri.queryParameters['activeTripId'],
+        ),
       ),
       GoRoute(
         path: '/trip-history',
@@ -119,6 +129,12 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/support-chat',
+        builder: (context, state) => SupportChatPage(
+          initialDraft: state.uri.queryParameters['draft'],
+        ),
+      ),
+      GoRoute(
         path: '/security-settings',
         builder: (context, state) => const SecuritySettingsPage(),
       ),
@@ -138,6 +154,30 @@ class AppRouter {
           return ScheduleDetailPage(trip: trip, fromHome: fromHome);
         },
       ),
+      GoRoute(
+        path: '/flash/incoming',
+        builder: (context, state) {
+          final tripId = state.uri.queryParameters['tripId']!;
+          return FlashIncomingCallPage(
+            tripId: tripId,
+            service: FlashTripService(client: Supabase.instance.client),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/flash/awaiting/:tripId',
+        builder: (context, state) => FlashAwaitingClientPage(
+          tripId: state.pathParameters['tripId']!,
+          service: FlashTripService(client: Supabase.instance.client),
+        ),
+      ),
+      GoRoute(
+        path: '/flash/recheck/:tripId',
+        builder: (context, state) => FlashRecheckPage(
+          tripId: state.pathParameters['tripId']!,
+          service: FlashTripService(client: Supabase.instance.client),
+        ),
+      ),
       // Service provider routes
       GoRoute(
         path: '/provider-home',
@@ -149,6 +189,15 @@ class AppRouter {
         path: '/provider-earnings',
         builder: (context, state) => ProviderEarningsPage(
           onNavTap: (i) => _handleProviderNavTap(context, i),
+        ),
+      ),
+      GoRoute(
+        path: '/provider-benefits',
+        builder: (context, state) => BenefitsPage(
+          bottomNavigationBar: ServiceProviderBottomNav(
+            selectedIndex: 2,
+            onItemSelected: (i) => _handleProviderNavTap(context, i),
+          ),
         ),
       ),
       GoRoute(
@@ -187,10 +236,20 @@ class AppRouter {
     GoRouterState state,
     int index,
   ) {
+    if (index == 4) {
+      context.push('/support-chat');
+      return;
+    }
     final routes = ['/home', '/schedules', '/earnings', '/profile'];
-    final activeTripId = state.uri.queryParameters['returnToActiveTripId'];
+    final activeTripId =
+        state.uri.queryParameters['returnToActiveTripId'] ??
+        state.uri.queryParameters['activeTripId'];
     if (activeTripId == null) {
       context.go(routes[index]);
+      return;
+    }
+    if (index == 0) {
+      context.go('/home?activeTripId=${Uri.encodeComponent(activeTripId)}');
       return;
     }
     context.pushReplacement(
@@ -233,9 +292,14 @@ class AppRouter {
     const routes = [
       '/provider-home',
       '/provider-earnings',
+      '/provider-benefits',
       '/provider-profile',
     ];
     context.go(routes[index]);
+  }
+
+  static void openPushLocation(String location) {
+    router.go(location);
   }
 
   static Future<String> _driverStartLocation() async {
