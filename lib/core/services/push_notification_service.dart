@@ -153,7 +153,8 @@ class PushNotificationService {
         type == 'awaiting_driver_confirmation' ||
         type == 'passenger_accepted_trip' ||
         type == 'client_accepted_trip' ||
-        type == 'trip_accepted_by_client';
+        type == 'trip_accepted_by_client' ||
+        type == 'scheduled_direct_request';
   }
 
   static TripNotificationContent? buildTripNotificationContent(
@@ -353,7 +354,14 @@ class PushNotificationService {
       final route = '${data['route'] ?? '/flash/incoming'}';
       return '$route?tripId=${Uri.encodeComponent(tripId)}';
     }
+    if (tripType == 'scheduled_choose_driver' && tripId.isNotEmpty) {
+      return '/schedules?tripId=${Uri.encodeComponent(tripId)}';
+    }
     final type = '${data['type'] ?? data['event'] ?? ''}';
+    if ((type == 'scheduled_direct_request' || type == 'scheduled_direct_confirmed') &&
+        tripId.isNotEmpty) {
+      return '/schedules?tripId=${Uri.encodeComponent(tripId)}';
+    }
     if ((type == 'trip_request' ||
             type == 'new_trip_request' ||
             type == 'recheck' ||
