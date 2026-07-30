@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/constants/category_colors.dart';
 import 'package:kz_servicos_prestador/core/models/service_request_data.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/service_request_service.dart';
 import 'package:kz_servicos_prestador/core/widgets/service_provider_bottom_nav.dart';
+import 'package:kz_servicos_prestador/features/other_services/domain/service_request_realtime_reload_policy.dart';
 
 class ServiceRequestsPage extends StatefulWidget {
   final ValueChanged<int> onNavTap;
@@ -22,22 +24,58 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
   bool _loading = true;
   List<ServiceRequestData> _requests = [];
   final Set<String> _hiddenIds = {};
+  Set<String> _providerCategoryIds = {};
+  RealtimeChannel? _serviceRequestsChannel;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _load().then((_) {
+      if (mounted) _subscribeToServiceRequests();
+    });
+  }
+
+  @override
+  void dispose() {
+    _serviceRequestsChannel?.unsubscribe();
+    super.dispose();
   }
 
   Future<void> _load() async {
     setState(() => _loading = true);
     final providerId = AuthState.providerProfileId ?? '';
     final result = await _service.getProviderRequests(providerId);
+    final categoryIds = await _service.getProviderCategoryIds(providerId);
     if (!mounted) return;
     setState(() {
       _requests = result;
+      _providerCategoryIds = categoryIds;
       _loading = false;
     });
+  }
+
+  void _subscribeToServiceRequests() {
+    final providerId = AuthState.providerProfileId;
+    if (providerId == null || providerId.isEmpty) return;
+    _serviceRequestsChannel?.unsubscribe();
+    _serviceRequestsChannel = Supabase.instance.client
+        .channel('provider-service-requests-$providerId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'service_requests',
+          callback: (payload) {
+            if (ServiceRequestRealtimeReloadPolicy.changeTargetsProvider(
+              providerProfileId: providerId,
+              providerCategoryIds: _providerCategoryIds,
+              newRecord: payload.newRecord,
+              oldRecord: payload.oldRecord,
+            )) {
+              _load();
+            }
+          },
+        )
+        .subscribe();
   }
 
   List<ServiceRequestData> get _filteredRequests {
@@ -73,88 +111,75 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomPad = MediaQuery.of(context).padding.bottom;
-
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Solicitações de Serviço',
-                        style: TextStyle(
-                          fontFamily: 'OutfitBlack',
-                          fontSize: 24,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildHomeBanner(context),
-                      const SizedBox(height: 16),
-                      _buildFilterChips(),
-                    ],
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+        child: ServiceProviderBottomNav(
+          selectedIndex: 0,
+          onItemSelected: widget.onNavTap,
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Solicitações de Serviço',
+                    style: TextStyle(
+                      fontFamily: 'OutfitBlack',
+                      fontSize: 24,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: _loading
-                      ? const Center(child: CircularProgressIndicator())
-                      : RefreshIndicator(
-                          onRefresh: _load,
-                          child: _filteredRequests.isEmpty
-                              ? ListView(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  children: [
-                                    SizedBox(
-                                      height:
-                                          MediaQuery.of(context).size.height *
-                                          0.5,
-                                      child: _buildEmptyState(),
-                                    ),
-                                  ],
-                                )
-                              : ListView.builder(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  padding: EdgeInsets.fromLTRB(
-                                    24,
-                                    0,
-                                    24,
-                                    bottomPad + 100,
-                                  ),
-                                  itemCount: _filteredRequests.length,
-                                  itemBuilder: (_, i) => _RequestCard(
-                                    request: _filteredRequests[i],
-                                    onAccept: () =>
-                                        _onAccept(_filteredRequests[i]),
-                                    onReject: () =>
-                                        _onReject(_filteredRequests[i]),
-                                  ),
+                  const SizedBox(height: 16),
+                  _buildHomeBanner(context),
+                  const SizedBox(height: 16),
+                  _buildFilterChips(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: _load,
+                      child: _filteredRequests.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                SizedBox(
+                                  height:
+                                      MediaQuery.of(context).size.height * 0.5,
+                                  child: _buildEmptyState(),
                                 ),
-                        ),
-                ),
-              ],
+                              ],
+                            )
+                          : ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(
+                                24,
+                                0,
+                                24,
+                                24,
+                              ),
+                              itemCount: _filteredRequests.length,
+                              itemBuilder: (_, i) => _RequestCard(
+                                request: _filteredRequests[i],
+                                onAccept: () => _onAccept(_filteredRequests[i]),
+                                onReject: () => _onReject(_filteredRequests[i]),
+                              ),
+                            ),
+                    ),
             ),
-          ),
-          Positioned(
-            bottom: bottomPad + 12,
-            left: 24,
-            right: 24,
-            child: ServiceProviderBottomNav(
-              selectedIndex: 0,
-              onItemSelected: widget.onNavTap,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -261,7 +286,13 @@ class _RequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final categoryColor = categoryColorFor(request.categoryName);
+    final isFreeform = request.freeformProfession?.isNotEmpty == true;
+    final badgeLabel = isFreeform
+        ? '👤 ${request.freeformProfession}'
+        : request.categoryName;
+    final categoryColor = isFreeform
+        ? const Color(0xFF8B5CF6)
+        : categoryColorFor(request.categoryName);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -295,7 +326,7 @@ class _RequestCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  request.categoryName,
+                  badgeLabel,
                   style: TextStyle(
                     fontFamily: 'QuasimodoSemiBold',
                     fontSize: 12,
@@ -316,6 +347,35 @@ class _RequestCard extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
+          if (request.photoUrls.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 64,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: request.photoUrls.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, index) => ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    request.photoUrls[index],
+                    width: 72,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      width: 72,
+                      height: 64,
+                      color: Colors.grey.shade200,
+                      child: const Icon(
+                        Icons.broken_image_outlined,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           Row(
             children: [

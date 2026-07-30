@@ -4,10 +4,28 @@ import 'package:kz_servicos_prestador/core/models/service_request_data.dart';
 
 const _serviceRequestSelect =
     '*, service_categories(name), addresses(formatted_address), '
-    'client:users!client_id(full_name)';
+    'client:users!client_id(full_name), service_request_photos(*)';
 
 class ServiceRequestService {
   final SupabaseClient _client = Supabase.instance.client;
+
+  Future<Set<String>> getProviderCategoryIds(String providerProfileId) async {
+    try {
+      final categoriesRes = await _client
+          .from('provider_category_services')
+          .select('service_category_id')
+          .eq('provider_profile_id', providerProfileId);
+
+      return (categoriesRes as List)
+          .map((c) => (c as Map)['service_category_id'] as String?)
+          .where((id) => id != null)
+          .cast<String>()
+          .toSet();
+    } catch (e) {
+      debugPrint('[ServiceRequestService] getProviderCategoryIds erro: $e');
+      return {};
+    }
+  }
 
   /// Solicitações disponíveis para o prestador (das suas categorias) +
   /// solicitações que ele já aceitou.
@@ -15,16 +33,7 @@ class ServiceRequestService {
     String providerProfileId,
   ) async {
     try {
-      final categoriesRes = await _client
-          .from('provider_category_services')
-          .select('service_category_id')
-          .eq('provider_profile_id', providerProfileId);
-
-      final categoryIds = (categoriesRes as List)
-          .map((c) => (c as Map)['service_category_id'] as String?)
-          .where((id) => id != null)
-          .cast<String>()
-          .toList();
+      final categoryIds = await getProviderCategoryIds(providerProfileId);
 
       final requests = <ServiceRequestData>[];
 
@@ -34,7 +43,7 @@ class ServiceRequestService {
             .select(_serviceRequestSelect)
             .filter('provider_profile_id', 'is', null)
             .eq('status', 'open')
-            .inFilter('service_category_id', categoryIds)
+            .inFilter('service_category_id', categoryIds.toList())
             .order('service_date');
 
         requests.addAll(
@@ -53,6 +62,32 @@ class ServiceRequestService {
         (acceptedRes as List)
             .map((m) => ServiceRequestData.fromMap(m as Map<String, dynamic>)),
       );
+
+      // Subprojeto 6: requests com freeform_profession (sem categoria fixa)
+      // para as quais o prestador foi CONVIDADO pelo admin via
+      // service_request_provider_candidates (status='pending').
+      try {
+        final invitedRes = await _client
+            .from('service_request_provider_candidates')
+            .select(
+              'service_request_id, status, '
+              'service_requests!inner(*, service_categories(name), '
+              'addresses(formatted_address), '
+              'client:users!client_id(full_name), '
+              'service_request_photos(*))',
+            )
+            .eq('provider_profile_id', providerProfileId)
+            .eq('status', 'pending');
+
+        for (final row in invitedRes as List) {
+          final map = (row as Map<String, dynamic>)['service_requests'];
+          if (map is Map<String, dynamic>) {
+            requests.add(ServiceRequestData.fromMap(map));
+          }
+        }
+      } catch (e) {
+        debugPrint('[ServiceRequestService] invited fetch erro: $e');
+      }
 
       return requests;
     } catch (e) {
