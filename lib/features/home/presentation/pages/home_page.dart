@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -11,13 +10,13 @@ import 'package:kz_servicos_prestador/core/constants/map_styles.dart';
 import 'package:kz_servicos_prestador/core/maps/kz_map.dart';
 import 'package:kz_servicos_prestador/core/maps/route_polyline_builder.dart';
 import 'package:kz_servicos_prestador/core/widgets/provider_bottom_nav.dart';
-import 'package:kz_servicos_prestador/features/home/presentation/widgets/online_toggle.dart';
-import 'package:kz_servicos_prestador/features/home/presentation/widgets/scheduled_trips_carousel.dart';
-import 'package:kz_servicos_prestador/features/home/presentation/widgets/trip_request_card.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/driver_service.dart';
 import 'package:kz_servicos_prestador/core/services/trip_chat_service.dart';
+import 'package:kz_servicos_prestador/features/home/presentation/widgets/active_trip_return_button.dart';
+import 'package:kz_servicos_prestador/features/home/presentation/widgets/pending_trip_requests_carousel.dart';
+import 'package:kz_servicos_prestador/core/services/push_notification_service.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
 import 'package:kz_servicos_prestador/features/home/domain/home_realtime_reload_policy.dart';
 import 'package:kz_servicos_prestador/features/trip/data/services/directions_service.dart';
@@ -25,17 +24,34 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:kz_servicos_prestador/core/services/trip_audio_service.dart';
 
 const double _driverDefaultZoom = 17.5;
+const double _requestDriverRouteMaxDistanceMeters = 150000;
+const Duration _requestRefreshFallbackInterval = Duration(seconds: 10);
+const Duration _realtimeReloadDebounce = Duration(milliseconds: 350);
+
+class _RoutePreview {
+  final Set<Marker> markers;
+  final Set<Polyline> polylines;
+
+  const _RoutePreview({required this.markers, required this.polylines});
+}
 
 class HomePage extends StatefulWidget {
   final ValueChanged<int> onNavTap;
+  final String? tripRequestId;
+  final String? activeTripId;
 
-  const HomePage({super.key, required this.onNavTap});
+  const HomePage({
+    super.key,
+    required this.onNavTap,
+    this.tripRequestId,
+    this.activeTripId,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+class _HomePageState extends State<HomePage> {
   KzMapController? _mapController;
   bool _isOnline = false;
   bool _showRequest = false;
@@ -50,15 +66,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final DirectionsService _directionsService = DirectionsService();
   final TripAudioService _tripAudio = TripAudioService();
   int _routeRequestSerial = 0;
+  bool _requestSurfaceOpen = false;
+  String? _openedRequestTripId;
 
   LatLng _currentLocation = const LatLng(-23.5505, -46.6333);
   bool _locationLoaded = false;
-
-  // Pulse animation state
-  AnimationController? _pulseController;
-  List<LatLng> _routePoints = [];
-  List<double> _routeDistances = [];
-  double _routeTotalLength = 0;
 
   // Cached custom icons
   BitmapDescriptor? _yellowPinIcon;
@@ -72,7 +84,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   RealtimeChannel? _invitationsChannel;
   RealtimeChannel? _driverTripsChannel;
   RealtimeChannel? _chatMessagesChannel;
+  StreamSubscription<Map<String, dynamic>>? _pushEventsSubscription;
   int _totalUnreadMessages = 0;
+  Timer? _reloadDebounceTimer;
+  bool _loadInFlight = false;
+  bool _reloadQueued = false;
+  String? _routePreviewKey;
+  final Map<String, _RoutePreview> _routePreviewCache = {};
 
   TripData get _currentRequest => _requests[_currentRequestIndex];
 
@@ -81,12 +99,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     super.initState();
     _initLocation();
     _initIcons();
-    _load().then((_) => _subscribeToInvitations());
+    _load().then((_) {
+      _subscribeToInvitations();
+      _startRequestRefreshWatchdog();
+    });
     _loadUnreadMessages().then((_) => _subscribeToChatMessages());
-    AuthState.scheduledTrips?.addListener(_onScheduledTripsChanged);
+    _subscribeToForegroundPushEvents();
   }
 
   Future<void> _load() async {
+    if (_loadInFlight) {
+      _reloadQueued = true;
+      return;
+    }
+
+    _loadInFlight = true;
     final userId = AuthState.userId;
     final driverProfileId = AuthState.driverProfileId;
     debugPrint('[HomePage] _load — driverProfileId: $driverProfileId');
@@ -94,52 +121,86 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       debugPrint(
         '[HomePage] driverProfileId é null — usuário não é motorista ou sessão não restaurou esse campo',
       );
+      _loadInFlight = false;
       return;
     }
 
-    final profileFuture = _driverService.getDriverProfile(userId ?? '');
-    final tripsFuture = Future.wait([
-      _tripService.getDriverRecheckRequests(driverProfileId),
-      _tripService.getDriverInvitations(driverProfileId),
-    ]);
-    final profile = await profileFuture;
-    final tripResults = await tripsFuture;
-    final trips = [...tripResults[0], ...tripResults[1]];
+    try {
+      final previousTripId = _requests.isNotEmpty
+          ? _requests[_currentRequestIndex].tripId
+          : null;
+      final profileFuture = _driverService.getDriverProfile(userId ?? '');
+      final tripsFuture = Future.wait([
+        _tripService.getDriverRecheckRequests(driverProfileId),
+        _tripService.getDriverInvitations(driverProfileId),
+      ]);
+      final profile = await profileFuture;
+      final tripResults = await tripsFuture;
+      final trips = [...tripResults[0], ...tripResults[1]];
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    final isAvailable = profile?.isAvailable ?? false;
-    setState(() => _isOnline = isAvailable);
+      final isAvailable = profile?.isAvailable ?? false;
+      setState(() => _isOnline = isAvailable);
 
-    debugPrint('[HomePage] convites recebidos: ${trips.length}');
-    setState(() {
-      _requests = trips;
-      _currentRequestIndex = 0;
-      _showRequest = trips.isNotEmpty && isAvailable;
-    });
+      if (_openedRequestTripId != null &&
+          trips.every((trip) => trip.tripId != _openedRequestTripId)) {
+        _openedRequestTripId = null;
+      }
 
-    if (trips.isNotEmpty && isAvailable) {
-      _fetchRouteForCurrentRequest();
-      _tripAudio.playNotificationLoop();
-    } else {
-      _tripAudio.stopNotification();
+      debugPrint('[HomePage] convites recebidos: ${trips.length}');
+      final nextIndex = _resolveRequestIndex(
+        trips: trips,
+        preferredTripId: previousTripId ?? widget.tripRequestId?.trim(),
+      );
+      setState(() {
+        _requests = trips;
+        _currentRequestIndex = nextIndex;
+        _showRequest = trips.isNotEmpty && isAvailable;
+        _requestSurfaceOpen = false;
+        _routePreviewKey = null;
+      });
+
+      if (trips.isNotEmpty && isAvailable) {
+        _showNextRequest();
+      } else {
+        _routePreviewKey = null;
+        _tripAudio.stopNotification();
+      }
+    } finally {
+      _loadInFlight = false;
+      if (_reloadQueued && mounted) {
+        _reloadQueued = false;
+        unawaited(_load());
+      }
     }
   }
 
-  void _onScheduledTripsChanged() {
-    if (mounted) setState(() {});
+  int _resolveRequestIndex({
+    required List<TripData> trips,
+    String? preferredTripId,
+  }) {
+    if (trips.isEmpty) return 0;
+    final normalizedPreferred = preferredTripId?.trim();
+    if (normalizedPreferred != null && normalizedPreferred.isNotEmpty) {
+      final preferredIndex = trips.indexWhere(
+        (request) => request.tripId == normalizedPreferred,
+      );
+      if (preferredIndex >= 0) return preferredIndex;
+    }
+    return 0;
   }
 
   @override
   void dispose() {
-    _stopPulseAnimation();
     _requestTimer?.cancel();
+    _reloadDebounceTimer?.cancel();
     _invitationsChannel?.unsubscribe();
     _driverTripsChannel?.unsubscribe();
     _chatMessagesChannel?.unsubscribe();
+    _pushEventsSubscription?.cancel();
     _tripAudio.stopNotification();
     unawaited(_tripAudio.dispose());
-    AuthState.scheduledTrips?.removeListener(_onScheduledTripsChanged);
     super.dispose();
   }
 
@@ -158,7 +219,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               newRecord: payload.newRecord,
               oldRecord: payload.oldRecord,
             )) {
-              unawaited(_load());
+              _handleCandidateRealtimeChange(payload);
             }
           },
         )
@@ -176,11 +237,109 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               newRecord: payload.newRecord,
               oldRecord: payload.oldRecord,
             )) {
-              unawaited(_load());
+              _handleTripRealtimeChange(payload);
             }
           },
         )
         .subscribe();
+  }
+
+  void _handleCandidateRealtimeChange(PostgresChangePayload payload) {
+    final record = payload.newRecord.isNotEmpty
+        ? payload.newRecord
+        : payload.oldRecord;
+    final candidateId = '${record['id'] ?? ''}';
+    final tripId = '${record['trip_id'] ?? ''}';
+    final status = record['status'] as String?;
+    if (candidateId.isEmpty && tripId.isEmpty) {
+      _scheduleReload();
+      return;
+    }
+
+    final index = _requests.indexWhere(
+      (request) =>
+          (candidateId.isNotEmpty && request.candidateId == candidateId) ||
+          (tripId.isNotEmpty && request.tripId == tripId),
+    );
+
+    if (status != 'pending') {
+      if (index >= 0) {
+        _removeRequestAt(index);
+      } else {
+        _scheduleReload();
+      }
+      return;
+    }
+
+    if (index < 0) {
+      _scheduleReload(delay: Duration.zero);
+      return;
+    }
+
+    _updateRequestAt(
+      index,
+      _requests[index].copyWith(
+        candidateStatus: status,
+        offeredPrice: (record['offered_price'] as num?)?.toDouble(),
+        priceRejectionReason: record['price_rejection_reason'] as String?,
+        kzProposedPrice: (record['kz_proposed_price'] as num?)?.toDouble(),
+        kzProposalLocked: record['kz_proposal_locked'] as bool?,
+      ),
+    );
+  }
+
+  void _handleTripRealtimeChange(PostgresChangePayload payload) {
+    final record = payload.newRecord.isNotEmpty
+        ? payload.newRecord
+        : payload.oldRecord;
+    final tripId = '${record['id'] ?? ''}';
+    if (tripId.isEmpty) {
+      _scheduleReload();
+      return;
+    }
+
+    final index = _requests.indexWhere((request) => request.tripId == tripId);
+    if (index < 0) {
+      _scheduleReload(delay: Duration.zero);
+      return;
+    }
+
+    final status = record['status'] as String?;
+    if (status != 'searching_drivers' &&
+        status != 'awaiting_driver_confirmation') {
+      _removeRequestAt(index);
+      return;
+    }
+
+    _updateRequestAt(index, _requests[index].copyWith(status: status));
+  }
+
+  void _startRequestRefreshWatchdog() {
+    _requestTimer?.cancel();
+    _requestTimer = Timer.periodic(_requestRefreshFallbackInterval, (_) {
+      if (!_isOnline) return;
+      _scheduleReload(delay: Duration.zero);
+    });
+  }
+
+  void _scheduleReload({Duration delay = _realtimeReloadDebounce}) {
+    _reloadDebounceTimer?.cancel();
+    _reloadDebounceTimer = Timer(delay, () {
+      if (mounted) unawaited(_load());
+    });
+  }
+
+  void _subscribeToForegroundPushEvents() {
+    _pushEventsSubscription = PushNotificationService.foregroundEvents.listen((
+      data,
+    ) {
+      final type = '${data['type'] ?? data['event'] ?? ''}';
+      if (PushNotificationService.isPersistentNotificationType(type)) {
+        _scheduleReload(delay: Duration.zero);
+      } else if (type == 'chat_message') {
+        unawaited(_loadUnreadMessages(playSoundOnIncrease: true));
+      }
+    });
   }
 
   void _subscribeToChatMessages() {
@@ -211,9 +370,62 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   void _showNextRequest() {
     if (!mounted || !_isOnline || _requests.isEmpty) return;
+    if (_requestSurfaceOpen) return;
     setState(() => _showRequest = true);
-    _fetchRouteForCurrentRequest();
+    _fetchRouteForCurrentRequestIfNeeded();
+    if (_requests.length == 1) {
+      unawaited(_openRequestSurfaceIfNeeded());
+      _tripAudio.stopNotification();
+      return;
+    }
     _tripAudio.playNotificationLoop();
+  }
+
+  void _updateRequestAt(int index, TripData updated) {
+    if (!mounted || index < 0 || index >= _requests.length) return;
+    setState(() {
+      _requests = [
+        for (var i = 0; i < _requests.length; i++)
+          if (i == index) updated else _requests[i],
+      ];
+      if (_currentRequestIndex >= _requests.length) {
+        _currentRequestIndex = 0;
+      }
+      _showRequest = _isOnline && _requests.isNotEmpty;
+      _routePreviewKey = null;
+    });
+    if (_showRequest) {
+      _fetchRouteForCurrentRequestIfNeeded();
+    }
+  }
+
+  void _removeRequestAt(int index) {
+    if (!mounted || index < 0 || index >= _requests.length) return;
+    final remaining = List<TripData>.from(_requests)..removeAt(index);
+    setState(() {
+      _requests = remaining;
+      if (remaining.isEmpty) {
+        _currentRequestIndex = 0;
+      } else if (_currentRequestIndex >= remaining.length) {
+        _currentRequestIndex = remaining.length - 1;
+      } else if (index < _currentRequestIndex) {
+        _currentRequestIndex -= 1;
+      }
+      _showRequest = _isOnline && remaining.isNotEmpty;
+      _routeRequestSerial++;
+      _routePreviewKey = null;
+      if (remaining.isEmpty) {
+        _polylines = {};
+        _markers = {};
+      }
+    });
+
+    if (remaining.isNotEmpty) {
+      _showNextRequest();
+    } else {
+      _tripAudio.stopNotification();
+      _resetDriverMapView();
+    }
   }
 
   Future<void> _initIcons() async {
@@ -262,67 +474,106 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     });
   }
 
-  void _onToggleOnline(bool value) {
-    setState(() {
-      _isOnline = value;
-      _currentRequestIndex = 0;
-      _showRequest = false;
-      _polylines = {};
-      _markers = {};
-      _routeRequestSerial++;
-    });
-    _tripAudio.stopNotification();
-    _stopPulseAnimation();
-    _requestTimer?.cancel();
-    final driverProfileId = AuthState.driverProfileId;
-    if (driverProfileId != null) {
-      _driverService.updateAvailability(driverProfileId, value);
+  bool _isMobileLayout(BuildContext context) {
+    return MediaQuery.of(context).size.width < 768;
+  }
+
+  double _defaultMsgIconLeft(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    const iconSize = 52.0;
+    if (_isMobileLayout(context)) {
+      return (screenWidth - iconSize - 80).clamp(0.0, screenWidth - iconSize);
     }
-    if (value && _requests.isNotEmpty) {
-      _showNextRequest();
+    return 80;
+  }
+
+  double _defaultMsgIconTop(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    return screenHeight - bottomPadding - 12 - 72 - 52 - 16;
+  }
+
+  void _fetchRouteForCurrentRequestIfNeeded() {
+    if (_requests.isEmpty || _requestSurfaceOpen) {
+      return;
     }
+    final key = _requestRouteKey(_currentRequest);
+    final cachedPreview = _routePreviewCache[key];
+    if (cachedPreview != null) {
+      setState(() {
+        _markers = cachedPreview.markers;
+        _polylines = cachedPreview.polylines;
+        _routePreviewKey = key;
+      });
+      return;
+    }
+    if (_routePreviewKey == key) return;
+    _routePreviewKey = key;
+    unawaited(_fetchRouteForCurrentRequest());
+  }
+
+  String _requestRouteKey(TripData request) {
+    return [
+      request.tripId,
+      request.originLat,
+      request.originLng,
+      request.destinationLat,
+      request.destinationLng,
+    ].join('|');
   }
 
   Future<void> _fetchRouteForCurrentRequest() async {
+    if (_requestSurfaceOpen) return;
     final serial = ++_routeRequestSerial;
     final r = _currentRequest;
     final pickup = LatLng(r.originLat, r.originLng);
     final destination = LatLng(r.destinationLat, r.destinationLng);
+    final includeDriverRoute = _isDriverNearPickup(pickup);
 
     _showRequestRoutePreview(
       pickup: pickup,
       destination: destination,
       tripPoints: const [],
+      includeDriverLocation: includeDriverRoute,
     );
-    _fitAllBounds(pickup, destination);
 
-    final results = await Future.wait([
-      _directionsService.fetchRoute(origin: pickup, destination: destination),
-      _directionsService.fetchRoute(
-        origin: _currentLocation,
-        destination: pickup,
-      ),
-    ]);
+    final tripResult = await _directionsService.fetchRoute(
+      origin: pickup,
+      destination: destination,
+    );
+    final driverResult = includeDriverRoute
+        ? await _directionsService.fetchRoute(
+            origin: _currentLocation,
+            destination: pickup,
+          )
+        : null;
 
-    if (!mounted || _requests.isEmpty || serial != _routeRequestSerial) return;
+    if (!mounted ||
+        _requests.isEmpty ||
+        serial != _routeRequestSerial) {
+      return;
+    }
 
-    final tripPoints = results[0].polyline;
+    final tripPoints = tripResult.polyline;
+    final driverToPickupPoints = driverResult?.polyline ?? const <LatLng>[];
     _showRequestRoutePreview(
       pickup: pickup,
       destination: destination,
       tripPoints: tripPoints,
-      driverToPickupPoints: results[1].polyline,
+      driverToPickupPoints: driverToPickupPoints,
+      includeDriverLocation: includeDriverRoute,
     );
   }
 
-  void _showRequestRoutePreview({
+  _RoutePreview _buildRequestRoutePreview({
     required LatLng pickup,
     required LatLng destination,
     required List<LatLng> tripPoints,
     List<LatLng> driverToPickupPoints = const [],
+    bool includeDriverLocation = true,
   }) {
     final markers = <Marker>{};
-    if (_driverLocationIcon != null) {
+    if (includeDriverLocation && _driverLocationIcon != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('driver_location'),
@@ -367,135 +618,98 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       polylines.addAll(RoutePolylineBuilder.yellowRoute(tripPoints));
     }
 
-    setState(() {
-      _markers = markers;
-      _polylines = polylines;
-      _routePoints = tripPoints;
-    });
-    if (tripPoints.isNotEmpty) {
-      _startPulseAnimation(tripPoints);
-    } else {
-      _stopPulseAnimation();
-    }
+    return _RoutePreview(markers: markers, polylines: polylines);
   }
 
-  // ── Pulse animation (same as client app) ──
-
-  void _startPulseAnimation(List<LatLng> points) {
-    _stopPulseAnimation();
-    if (points.length < 2) return;
-    _routeDistances = _computeSegmentDistances(points);
-    _routeTotalLength = _routeDistances.isEmpty ? 0 : _routeDistances.last;
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 3000),
+  void _showRequestRoutePreview({
+    required LatLng pickup,
+    required LatLng destination,
+    required List<LatLng> tripPoints,
+    List<LatLng> driverToPickupPoints = const [],
+    bool includeDriverLocation = true,
+  }) {
+    final preview = _buildRequestRoutePreview(
+      pickup: pickup,
+      destination: destination,
+      tripPoints: tripPoints,
+      driverToPickupPoints: driverToPickupPoints,
+      includeDriverLocation: includeDriverLocation,
     );
-    _pulseController!.addListener(_updatePulsePolyline);
-    _pulseController!.repeat();
-  }
-
-  void _stopPulseAnimation() {
-    _pulseController?.removeListener(_updatePulsePolyline);
-    _pulseController?.dispose();
-    _pulseController = null;
-  }
-
-  List<double> _computeSegmentDistances(List<LatLng> pts) {
-    final dists = <double>[0.0];
-    for (int i = 1; i < pts.length; i++) {
-      dists.add(dists.last + _haversine(pts[i - 1], pts[i]));
-    }
-    return dists;
-  }
-
-  double _haversine(LatLng a, LatLng b) {
-    const r = 6371000.0;
-    final dLat = _toRad(b.latitude - a.latitude);
-    final dLon = _toRad(b.longitude - a.longitude);
-    final hav =
-        math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_toRad(a.latitude)) *
-            math.cos(_toRad(b.latitude)) *
-            math.sin(dLon / 2) *
-            math.sin(dLon / 2);
-    return r * 2 * math.atan2(math.sqrt(hav), math.sqrt(1 - hav));
-  }
-
-  static double _toRad(double deg) => deg * math.pi / 180;
-
-  LatLng _interpolateAtDistance(double dist) {
-    if (dist <= 0) return _routePoints.first;
-    if (dist >= _routeTotalLength) return _routePoints.last;
-    int lo = 0, hi = _routeDistances.length - 1;
-    while (lo < hi - 1) {
-      final mid = (lo + hi) ~/ 2;
-      if (_routeDistances[mid] <= dist) {
-        lo = mid;
-      } else {
-        hi = mid;
-      }
-    }
-    final segStart = _routeDistances[lo];
-    final segEnd = _routeDistances[hi];
-    final t = (dist - segStart) / (segEnd - segStart);
-    final a = _routePoints[lo];
-    final b = _routePoints[hi];
-    return LatLng(
-      a.latitude + (b.latitude - a.latitude) * t,
-      a.longitude + (b.longitude - a.longitude) * t,
-    );
-  }
-
-  List<LatLng> _extractSubRoute(double from, double to) {
-    final result = <LatLng>[];
-    result.add(_interpolateAtDistance(from));
-    for (int i = 0; i < _routeDistances.length; i++) {
-      final d = _routeDistances[i];
-      if (d > from && d < to) result.add(_routePoints[i]);
-    }
-    result.add(_interpolateAtDistance(to));
-    return result;
-  }
-
-  void _updatePulsePolyline() {
-    if (_routePoints.length < 2 || !mounted) return;
-    final t = _pulseController!.value;
-    const segmentRatio = 0.20;
-    final headDist = t * (_routeTotalLength * (1 + segmentRatio));
-    final tailDist = headDist - _routeTotalLength * segmentRatio;
-    final clampedHead = headDist.clamp(0.0, _routeTotalLength);
-    final clampedTail = tailDist.clamp(0.0, _routeTotalLength);
-
-    if (clampedHead - clampedTail < 1) {
-      setState(() {
-        _polylines = {
-          ..._polylines.where((p) => p.polylineId.value == 'driver_route'),
-          ...RoutePolylineBuilder.yellowRoute(_routePoints),
-        };
-      });
-      return;
-    }
-
-    final glowPoints = _extractSubRoute(clampedTail, clampedHead);
-    final fadeFactor = _computeFade(t);
 
     setState(() {
-      _polylines = {
-        ..._polylines.where((p) => p.polylineId.value == 'driver_route'),
-        ...RoutePolylineBuilder.yellowPulsingRoute(
-          routePoints: _routePoints,
-          pulsePoints: glowPoints,
-          fadeFactor: fadeFactor,
-        ),
-      };
+      _markers = preview.markers;
+      _polylines = preview.polylines;
     });
+
+    if (tripPoints.isNotEmpty && _routePreviewKey != null) {
+      _routePreviewCache[_routePreviewKey!] = preview;
+    }
   }
 
-  double _computeFade(double t) {
-    const fadeZone = 0.08;
-    if (t < fadeZone) return t / fadeZone;
-    if (t > 1 - fadeZone) return (1 - t) / fadeZone;
-    return 1.0;
+  bool _isDriverNearPickup(LatLng pickup) {
+    final distanceMeters = Geolocator.distanceBetween(
+      _currentLocation.latitude,
+      _currentLocation.longitude,
+      pickup.latitude,
+      pickup.longitude,
+    );
+    return distanceMeters <= _requestDriverRouteMaxDistanceMeters;
+  }
+
+  int _requestSurfaceIndex() {
+    if (_requests.isEmpty) return -1;
+    return _currentRequestIndex.clamp(0, _requests.length - 1);
+  }
+
+  Future<void> _openRequestSurfaceIfNeeded() async {
+    if (!mounted || !_isOnline || _requests.isEmpty) return;
+    if (_requests.length > 1) return;
+
+    final index = _requestSurfaceIndex();
+    if (index < 0 || index >= _requests.length) return;
+
+    final request = _requests[index];
+    if (_openedRequestTripId == request.tripId) return;
+
+    setState(() {
+      _requestSurfaceOpen = true;
+      _openedRequestTripId = request.tripId;
+      _routePreviewKey = null;
+      _polylines = {};
+      _markers = {};
+    });
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
+    await context.push('/schedule-detail?fromHome=true', extra: request);
+    if (!mounted) return;
+
+    setState(() {
+      _requestSurfaceOpen = false;
+    });
+    _scheduleReload(delay: Duration.zero);
+  }
+
+  Future<void> _openSelectedRequestDetails() async {
+    if (!mounted || _requests.isEmpty || _requestSurfaceOpen) return;
+
+    final index = _requestSurfaceIndex();
+    if (index < 0 || index >= _requests.length) return;
+    final request = _requests[index];
+
+    setState(() {
+      _requestSurfaceOpen = true;
+      _openedRequestTripId = request.tripId;
+    });
+
+    await context.push('/schedule-detail?fromHome=true', extra: request);
+    if (!mounted) return;
+
+    setState(() {
+      _requestSurfaceOpen = false;
+    });
+    _scheduleReload(delay: Duration.zero);
   }
 
   // ── Custom marker icons (same as client app) ──
@@ -577,113 +791,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
   }
 
-  // ── Map helpers ──
-
-  void _fitAllBounds(LatLng pickup, LatLng destination) {
-    if (_mapController == null) return;
-    final allPoints = [_currentLocation, pickup, destination];
-    double minLat = allPoints.first.latitude;
-    double maxLat = allPoints.first.latitude;
-    double minLng = allPoints.first.longitude;
-    double maxLng = allPoints.first.longitude;
-    for (final p in allPoints) {
-      if (p.latitude < minLat) minLat = p.latitude;
-      if (p.latitude > maxLat) maxLat = p.latitude;
-      if (p.longitude < minLng) minLng = p.longitude;
-      if (p.longitude > maxLng) maxLng = p.longitude;
-    }
-    _mapController!.fitBounds(
-      LatLngBounds(
-        southwest: LatLng(minLat, minLng),
-        northeast: LatLng(maxLat, maxLng),
-      ),
-      padding: 80,
-    );
-  }
-
-  Future<void> _onAccept(double? price) async {
-    final driverProfileId = AuthState.driverProfileId;
-    if (driverProfileId == null) return;
-    _tripAudio.stopNotification();
-    unawaited(_tripAudio.playAccept());
-    final request = _requests[_currentRequestIndex];
-    final ok = request.status == 'awaiting_driver_confirmation'
-        ? await _tripService.confirmScheduledTrip(request.tripId, null)
-        : await _tripService.acceptCandidate(
-            request.tripId,
-            driverProfileId,
-            offeredPrice: price,
-          );
-    if (!mounted) return;
-    if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Não foi possível aceitar a solicitação.'),
-        ),
-      );
-      return;
-    }
-    _stopPulseAnimation();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          request.status == 'awaiting_driver_confirmation'
-              ? 'Agendamento confirmado!'
-              : 'Solicitação aceita! Acompanhe em Agendamentos.',
-        ),
-        backgroundColor: Color(0xFF2ECC71),
-      ),
-    );
-    _advanceToNextRequest();
-  }
-
-  Future<void> _onReject() async {
-    final observation = await _showRejectDialog();
-    if (observation == null) return; // cancelado
-    _tripAudio.stopNotification();
-    final driverProfileId = AuthState.driverProfileId;
-    if (driverProfileId == null) return;
-    final trip = _requests[_currentRequestIndex];
-    final ok = trip.status == 'awaiting_driver_confirmation'
-        ? await _tripService.rejectTrip(
-            trip.tripId,
-            observation,
-            driverProfileId: driverProfileId,
-          )
-        : await _tripService.rejectCandidate(
-            trip.tripId,
-            driverProfileId,
-            observation: observation.isEmpty ? null : observation,
-          );
-    if (!mounted) return;
-    if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Não foi possível recusar a solicitação.'),
-        ),
-      );
-      return;
-    }
-    _stopPulseAnimation();
-    _advanceToNextRequest();
-  }
-
-  void _advanceToNextRequest() {
-    final remaining = List<TripData>.from(_requests)
-      ..removeAt(_currentRequestIndex);
+  void _selectRequest(TripData request) {
+    final index = _requests.indexWhere((trip) => trip.tripId == request.tripId);
+    if (index < 0 || index == _currentRequestIndex) return;
     setState(() {
-      _requests = remaining;
-      _currentRequestIndex = 0;
-      _showRequest = false;
-      _polylines = {};
-      _markers = {};
-      _routeRequestSerial++;
+      _currentRequestIndex = index;
+      _routePreviewKey = null;
     });
-    if (_requests.isNotEmpty) {
-      _showNextRequest();
-    } else {
-      _resetDriverMapView();
-    }
+    _fetchRouteForCurrentRequestIfNeeded();
+  }
+
+  Future<void> _openSelectedRequestFromCard(TripData request) async {
+    _selectRequest(request);
+    _tripAudio.stopNotification();
+    unawaited(_openSelectedRequestDetails());
   }
 
   void _resetDriverMapView() {
@@ -694,61 +815,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Future<String?> _showRejectDialog() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text(
-          'Recusar solicitação',
-          style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 18),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Você pode adicionar uma observação opcional explicando o motivo:',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'Observação (opcional)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: Text(
-              'Recusar',
-              style: TextStyle(
-                color: Colors.red.shade400,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    return result;
-  }
-
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final hasActiveTripShortcut =
+        widget.activeTripId != null && widget.activeTripId!.isNotEmpty;
+    final mapPadding = EdgeInsets.only(
+      top:
+          MediaQuery.of(context).padding.top +
+          _homeBannerHeight(context) +
+          (hasActiveTripShortcut ? 132 : 72),
+      bottom:
+          bottomPadding + ((_showRequest && _requests.isNotEmpty) ? 300 : 96),
+      left: 16,
+      right: 16,
+    );
 
     return Scaffold(
       body: Stack(
@@ -759,6 +840,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               zoom: _driverDefaultZoom,
             ),
             style: MapStyles.standard,
+            padding: mapPadding,
             onMapCreated: (controller) {
               _mapController = controller;
               if (_locationLoaded) {
@@ -775,33 +857,36 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             zoomControlsEnabled: false,
           ),
 
-          // Online/Offline toggle
           Positioned(
-            top: MediaQuery.of(context).padding.top + 16,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: OnlineToggle(
-                isOnline: _isOnline,
-                onChanged: _onToggleOnline,
-              ),
-            ),
-          ),
-
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 72,
+            top: MediaQuery.of(context).padding.top + 8,
             left: 16,
             right: 16,
             child: _buildHomeBanner(context),
           ),
 
-          // Status badge
-          if (_isOnline && _showRequest)
+          if (hasActiveTripShortcut)
             Positioned(
               top:
                   MediaQuery.of(context).padding.top +
-                  88 +
-                  _homeBannerHeight(context),
+                  _homeBannerHeight(context) +
+                  18,
+              left: 16,
+              right: 16,
+              child: ActiveTripReturnButton(
+                onTap: () => context.go(
+                  '/active-trip?tripId=${Uri.encodeComponent(widget.activeTripId!)}',
+                ),
+              ),
+            ),
+
+          // Status badge
+          if (_isOnline && _showRequest && !_requestSurfaceOpen)
+            Positioned(
+              top:
+                  MediaQuery.of(context).padding.top +
+                  24 +
+                  _homeBannerHeight(context) +
+                  (hasActiveTripShortcut ? 64 : 0),
               left: 0,
               right: 0,
               child: Center(
@@ -822,7 +907,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ],
                   ),
                   child: Text(
-                    'Solicitação ${_currentRequestIndex + 1} de ${_requests.length}',
+                    _requests.length == 1
+                        ? '1 solicitação pendente'
+                        : 'Solicitação ${_currentRequestIndex + 1} de ${_requests.length}',
                     style: const TextStyle(
                       fontFamily: 'QuasimodoSemiBold',
                       fontSize: 13,
@@ -833,35 +920,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
             ),
 
-          // Trip request card
-          if (_isOnline && _showRequest && _requests.isNotEmpty)
+          // Pending request cards
+          if (_isOnline &&
+              _showRequest &&
+              _requests.isNotEmpty &&
+              !_requestSurfaceOpen)
             Positioned(
               bottom: bottomPadding + 100,
               left: 16,
               right: 16,
-              child: GestureDetector(
-                onTap: () => context.push(
-                  '/schedule-detail?fromHome=true',
-                  extra: _requests[_currentRequestIndex],
-                ),
-                child: TripRequestCard(
-                  request: _requests[_currentRequestIndex],
-                  onAccept: _onAccept,
-                  onReject: _onReject,
-                ),
-              ),
-            ),
-
-          // Carousel de corridas agendadas (só quando não há convite ativo sendo exibido)
-          if ((AuthState.scheduledTrips?.trips.isNotEmpty ?? false) &&
-              !(_showRequest && _requests.isNotEmpty))
-            Positioned(
-              bottom: bottomPadding + 104,
-              left: 16,
-              right: 16,
-              child: ScheduledTripsCarousel(
-                trips: AuthState.scheduledTrips!.trips,
-                onTap: (trip) => context.push('/schedule-detail', extra: trip),
+              child: PendingTripRequestsCarousel(
+                trips: _requests,
+                selectedTripId: _currentRequest.tripId,
+                onTripChanged: _selectRequest,
+                onTripTap: _openSelectedRequestFromCard,
               ),
             ),
 
@@ -870,11 +942,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             right: 16,
             bottom:
                 bottomPadding +
-                ((_showRequest && _requests.isNotEmpty)
-                    ? 320
-                    : (AuthState.scheduledTrips?.trips.isNotEmpty ?? false)
-                    ? 260
-                    : 100),
+                ((_showRequest && _requests.isNotEmpty) ? 230 : 100),
             child: FloatingActionButton.small(
               heroTag: 'myLocation',
               backgroundColor: Colors.white,
@@ -891,31 +959,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           // Floating draggable messages icon
           if (_totalUnreadMessages > 0)
             Positioned(
-              left: _msgIconLeft ?? MediaQuery.of(context).size.width - 52 - 24,
-              top:
-                  _msgIconTop ??
-                  MediaQuery.of(context).size.height -
-                      bottomPadding -
-                      12 -
-                      72 -
-                      52 -
-                      16,
+              left: _msgIconLeft ?? _defaultMsgIconLeft(context),
+              top: _msgIconTop ?? _defaultMsgIconTop(context),
               child: GestureDetector(
                 onPanUpdate: (details) {
                   setState(() {
                     final screenSize = MediaQuery.of(context).size;
                     _msgIconLeft =
-                        ((_msgIconLeft ?? screenSize.width - 52 - 24) +
+                        ((_msgIconLeft ?? _defaultMsgIconLeft(context)) +
                                 details.delta.dx)
                             .clamp(0.0, screenSize.width - 52);
                     _msgIconTop =
-                        ((_msgIconTop ??
-                                    screenSize.height -
-                                        bottomPadding -
-                                        12 -
-                                        72 -
-                                        52 -
-                                        16) +
+                        ((_msgIconTop ?? _defaultMsgIconTop(context)) +
                                 details.delta.dy)
                             .clamp(
                               MediaQuery.of(context).padding.top,

@@ -5,6 +5,7 @@ TripData makeTrip({
   required String status,
   String? candidateStatus,
   String? clientId,
+  String tripType = 'standard',
 }) {
   return TripData(
     tripId: 'trip-1',
@@ -23,6 +24,7 @@ TripData makeTrip({
     status: status,
     candidateStatus: candidateStatus,
     clientId: clientId,
+    tripType: tripType,
   );
 }
 
@@ -57,6 +59,31 @@ void main() {
 
     test('awaiting_driver_confirmation mostra re-check do motorista', () {
       final trip = makeTrip(status: 'awaiting_driver_confirmation');
+      expect(trip.statusLabel, 'Aguardando re-check do motorista');
+    });
+
+    test(
+      'pedido direto awaiting_driver_confirmation aguarda proposta do motorista',
+      () {
+        final trip = makeTrip(
+          status: 'awaiting_driver_confirmation',
+          candidateStatus: 'pending',
+          tripType: 'scheduled_choose_driver',
+        );
+
+        expect(trip.statusLabel, 'Aguardando proposta do motorista');
+      },
+    );
+
+    test('pedido direto aceito vira re-check do motorista', () {
+      final trip = makeTrip(
+        status: 'awaiting_driver_confirmation',
+        candidateStatus: 'accepted',
+        tripType: 'scheduled_choose_driver',
+      );
+
+      expect(trip.isScheduledDirectRequest, isFalse);
+      expect(trip.isDriverRecheck, isTrue);
       expect(trip.statusLabel, 'Aguardando re-check do motorista');
     });
 
@@ -168,11 +195,53 @@ void main() {
     });
 
     test('parseia trip_type=flash', () {
-      final flashMap = Map<String, dynamic>.from(map)
-        ..['trip_type'] = 'flash';
+      final flashMap = Map<String, dynamic>.from(map)..['trip_type'] = 'flash';
       final trip = TripData.fromMap(flashMap);
       expect(trip.tripType, 'flash');
       expect(trip.isFlash, isTrue);
     });
+
+    test(
+      'extrai candidate_status de trip_driver_candidates embutido quando a chave plana está ausente',
+      () {
+        final embeddedMap = Map<String, dynamic>.from(map)
+          ..remove('candidate_status')
+          ..['trip_driver_candidates'] = [
+            {'status': 'accepted'},
+          ];
+        final trip = TripData.fromMap(embeddedMap);
+        expect(trip.candidateStatus, 'accepted');
+      },
+    );
+
+    test(
+      'chave plana candidate_status tem prioridade sobre trip_driver_candidates embutido',
+      () {
+        final embeddedMap = Map<String, dynamic>.from(map)
+          ..['candidate_status'] = 'pending'
+          ..['trip_driver_candidates'] = [
+            {'status': 'accepted'},
+          ];
+        final trip = TripData.fromMap(embeddedMap);
+        expect(trip.candidateStatus, 'pending');
+      },
+    );
+
+    test(
+      'reproduz bug do re-check: trip vinda de getDriverScheduledTrips/getDriverRecheckRequests '
+      'com candidatura já aceita deve ser reconhecida como recheck, não como pedido direto novo',
+      () {
+        final recheckMap = Map<String, dynamic>.from(map)
+          ..remove('candidate_status')
+          ..['status'] = 'awaiting_driver_confirmation'
+          ..['trip_type'] = 'scheduled_choose_driver'
+          ..['trip_driver_candidates'] = [
+            {'status': 'accepted'},
+          ];
+        final trip = TripData.fromMap(recheckMap);
+        expect(trip.isScheduledDirectRequest, isFalse);
+        expect(trip.isDriverRecheck, isTrue);
+      },
+    );
   });
 }

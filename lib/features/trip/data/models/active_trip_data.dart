@@ -22,6 +22,10 @@ class ActiveTripData {
   final DateTime? startedAt;
   final DateTime? finishedAt;
   final bool isDriverPaid;
+  final bool isRoundTrip;
+  final String? executionStage;
+  final int? currentStopOrder;
+  final List<ActiveTripStop> stops;
 
   const ActiveTripData({
     required this.id,
@@ -45,6 +49,10 @@ class ActiveTripData {
     this.startedAt,
     this.finishedAt,
     this.isDriverPaid = false,
+    this.isRoundTrip = false,
+    this.executionStage,
+    this.currentStopOrder,
+    this.stops = const [],
   });
 
   String get paymentMethodLabel => switch (paymentMethod) {
@@ -129,6 +137,47 @@ class ActiveTripData {
       startedAt: parseDate(trip['started_at']),
       finishedAt: parseDate(trip['finished_at']),
       isDriverPaid: trip['is_driver_paied'] as bool? ?? false,
+      isRoundTrip: trip['is_round_trip'] as bool? ?? false,
+      executionStage: trip['execution_stage'] as String?,
+      currentStopOrder: trip['current_stop_order'] as int?,
+      stops: ((trip['trip_stops'] as List?) ?? const [])
+          .map((row) => ActiveTripStop.fromMap(row as Map<String, dynamic>))
+          .toList()
+        ..sort((a, b) => a.order.compareTo(b.order)),
+    );
+  }
+}
+
+class ActiveTripStop {
+  final String id;
+  final int order;
+  final String address;
+  final double latitude;
+  final double longitude;
+  final DateTime? arrivedAt;
+  final DateTime? resumedAt;
+
+  const ActiveTripStop({
+    required this.id,
+    required this.order,
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+    this.arrivedAt,
+    this.resumedAt,
+  });
+
+  factory ActiveTripStop.fromMap(Map<String, dynamic> row) {
+    final address = row['addresses'] as Map<String, dynamic>? ?? {};
+    double number(Object? value) => value is num ? value.toDouble() : double.tryParse('$value') ?? -23.5505;
+    return ActiveTripStop(
+      id: row['id'] as String,
+      order: row['stop_order'] as int? ?? 0,
+      address: address['formatted_address'] as String? ?? 'Parada',
+      latitude: number(address['latitude']),
+      longitude: number(address['longitude']),
+      arrivedAt: BrazilTime.maybeFromBackend(row['arrived_at']?.toString() ?? ''),
+      resumedAt: BrazilTime.maybeFromBackend(row['resumed_at']?.toString() ?? ''),
     );
   }
 }

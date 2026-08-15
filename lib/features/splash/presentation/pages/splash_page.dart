@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/services/auth_service.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/push_notification_service.dart';
@@ -87,7 +86,7 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.black,
       body: Center(
         child: Image.asset('assets/images/logo_colorida.png', width: 200),
       ),

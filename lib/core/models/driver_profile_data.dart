@@ -19,6 +19,7 @@ class DriverProfileData {
   final DateTime? cnhExpirationDate;
   final bool isAvailable;
   final VehicleData? vehicle;
+  final List<ProfilePhotoData> driverPhotos;
   final DateTime createdAt;
 
   const DriverProfileData({
@@ -42,10 +43,13 @@ class DriverProfileData {
     this.cnhExpirationDate,
     required this.isAvailable,
     this.vehicle,
+    this.driverPhotos = const [],
     required this.createdAt,
   });
 
   String get memberSince => createdAt.year.toString();
+  List<String> get driverPhotoUrls =>
+      driverPhotos.map((photo) => photo.url).toList(growable: false);
 
   factory DriverProfileData.fromMap(Map<String, dynamic> map) {
     final providerProfile =
@@ -53,14 +57,15 @@ class DriverProfileData {
     final driverProfile =
         providerProfile['driver_profiles'] as Map<String, dynamic>? ?? {};
     final vehiclesList = driverProfile['vehicles'] as List?;
+    final driverPhotosList = driverProfile['driver_profile_photos'] as List?;
 
     VehicleData? vehicle;
     if (vehiclesList != null && vehiclesList.isNotEmpty) {
-      final activeVehicle = vehiclesList.firstWhere(
-        (v) => v['is_active'] == true,
-        orElse: () => vehiclesList.first,
-      );
-      vehicle = VehicleData.fromMap(activeVehicle as Map<String, dynamic>);
+      final activeVehicle = vehiclesList.cast<Map<String, dynamic>>().firstWhere(
+            (v) => v['is_active'] == true,
+            orElse: () => vehiclesList.first as Map<String, dynamic>,
+          );
+      vehicle = VehicleData.fromMap(activeVehicle);
     }
 
     DateTime? cnhExpiry;
@@ -91,11 +96,33 @@ class DriverProfileData {
       cnhExpirationDate: cnhExpiry,
       isAvailable: driverProfile['is_available'] as bool? ?? false,
       vehicle: vehicle,
+      driverPhotos: _photos(driverPhotosList),
       createdAt: DateTime.parse(
         map['created_at'] as String? ?? DateTime.now().toIso8601String(),
       ),
     );
   }
+
+  static List<ProfilePhotoData> _photos(List? rows) {
+    if (rows == null) return const [];
+    return rows
+        .map((row) => ProfilePhotoData.fromMap(row as Map<String, dynamic>))
+        .where((photo) => photo.id.isNotEmpty && photo.url.isNotEmpty)
+        .toList(growable: false);
+  }
+}
+
+class ProfilePhotoData {
+  final String id;
+  final String url;
+
+  const ProfilePhotoData({required this.id, required this.url});
+
+  factory ProfilePhotoData.fromMap(Map<String, dynamic> map) =>
+      ProfilePhotoData(
+        id: map['id'] as String? ?? '',
+        url: map['photo_url'] as String? ?? '',
+      );
 }
 
 class VehicleData {
@@ -106,6 +133,7 @@ class VehicleData {
   final String color;
   final String licensePlate;
   final int passengerCapacity;
+  final List<ProfilePhotoData> photos;
 
   const VehicleData({
     required this.id,
@@ -115,9 +143,12 @@ class VehicleData {
     required this.color,
     required this.licensePlate,
     required this.passengerCapacity,
+    this.photos = const [],
   });
 
   String get fullModel => '$brand $model $year';
+  List<String> get photoUrls =>
+      photos.map((photo) => photo.url).toList(growable: false);
 
   factory VehicleData.fromMap(Map<String, dynamic> map) => VehicleData(
         id: map['id'] as String,
@@ -128,5 +159,6 @@ class VehicleData {
         licensePlate: map['license_plate'] as String? ?? '',
         passengerCapacity:
             (map['passenger_capacity'] as num?)?.toInt() ?? 4,
+        photos: DriverProfileData._photos(map['vehicle_photos'] as List?),
       );
 }

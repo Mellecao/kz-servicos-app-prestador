@@ -46,65 +46,55 @@ class _ProviderEarningsPageState extends State<ProviderEarningsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          SafeArea(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: _load,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(
-                          24, 24, 24, bottomPadding + 100),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Carteira',
-                            style: TextStyle(
-                              fontFamily: 'OutfitBlack',
-                              fontSize: 24,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          _BalanceCard(earnings: _earnings!),
-                          const SizedBox(height: 16),
-                          _TotalReceivedCard(earnings: _earnings!),
-                          const SizedBox(height: 16),
-                          EarningsChartCard(
-                            monthlyHistory: _earnings!.monthlyHistory,
-                            monthOverMonthDiff:
-                                _earnings!.currentMonthTotal -
-                                    _earnings!.previousMonthTotal,
-                          ),
-                          if (_profile != null) ...[
-                            const SizedBox(height: 16),
-                            _BankInfoCard(profile: _profile!),
-                          ],
-                          const SizedBox(height: 20),
-                          _StatementSection(
-                              entries: _earnings!.recentEntries),
-                        ],
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+        child: ServiceProviderBottomNav(
+          selectedIndex: 1,
+          onItemSelected: widget.onNavTap,
+        ),
+      ),
+      body: SafeArea(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _load,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Carteira',
+                        style: TextStyle(
+                          fontFamily: 'OutfitBlack',
+                          fontSize: 24,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 20),
+                      _BalanceCard(earnings: _earnings!),
+                      const SizedBox(height: 16),
+                      _TotalReceivedCard(earnings: _earnings!),
+                      const SizedBox(height: 16),
+                      EarningsChartCard(
+                        monthlyHistory: _earnings!.monthlyHistory,
+                        monthOverMonthDiff:
+                            _earnings!.currentMonthTotal -
+                            _earnings!.previousMonthTotal,
+                      ),
+                      if (_profile != null) ...[
+                        const SizedBox(height: 16),
+                        _BankInfoCard(profile: _profile!),
+                      ],
+                      const SizedBox(height: 20),
+                      _StatementSection(entries: _earnings!.recentEntries),
+                    ],
                   ),
-          ),
-          Positioned(
-            bottom: bottomPadding + 12,
-            left: 24,
-            right: 24,
-            child: ServiceProviderBottomNav(
-              selectedIndex: 1,
-              onItemSelected: widget.onNavTap,
-            ),
-          ),
-        ],
+                ),
+              ),
       ),
     );
   }

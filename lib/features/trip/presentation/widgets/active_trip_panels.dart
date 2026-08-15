@@ -11,8 +11,13 @@ class ActiveTripPanel extends StatelessWidget {
   final String buttonLabel;
   final VoidCallback onAdvance;
   final VoidCallback onChat;
+  final VoidCallback onSupportChat;
   final VoidCallback onCall;
+  final VoidCallback onOpenExternalNavigation;
+  final bool showExternalNavigation;
   final VoidCallback onReportProblem;
+  final bool cancellationPending;
+  final bool cancellationRequesting;
 
   const ActiveTripPanel({
     super.key,
@@ -23,29 +28,43 @@ class ActiveTripPanel extends StatelessWidget {
     required this.buttonLabel,
     required this.onAdvance,
     required this.onChat,
+    required this.onSupportChat,
     required this.onCall,
+    required this.onOpenExternalNavigation,
+    this.showExternalNavigation = false,
     required this.onReportProblem,
+    this.cancellationPending = false,
+    this.cancellationRequesting = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding + 20),
+      padding: EdgeInsets.fromLTRB(18, 12, 18, bottomPadding + 18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        color: const Color(0xFFFDFDFB),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Container(
+            width: 42,
+            height: 5,
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD8DCE2),
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
           Row(
             children: [
               _ClientAvatar(
@@ -83,7 +102,51 @@ class ActiveTripPanel extends StatelessWidget {
               CircleButton(icon: Icons.phone_outlined, onTap: onCall),
             ],
           ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 42,
+            child: OutlinedButton.icon(
+              onPressed: onSupportChat,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textPrimary,
+                side: const BorderSide(color: Color(0xFFD8DCE2)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: const Icon(Icons.support_agent_rounded, size: 18),
+              label: const Text(
+                'Chat com a KZ',
+                style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 13),
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
+          if (showExternalNavigation) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: OutlinedButton.icon(
+                onPressed: onOpenExternalNavigation,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.secondary,
+                  side: BorderSide(
+                    color: AppColors.secondary.withValues(alpha: 0.35),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                icon: const Icon(Icons.navigation_rounded, size: 18),
+                label: const Text(
+                  'Abrir rota em app externo',
+                  style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 13),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -91,9 +154,10 @@ class ActiveTripPanel extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: phaseColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 18),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(18),
                 ),
               ),
               child: Text(
@@ -102,20 +166,36 @@ class ActiveTripPanel extends StatelessWidget {
               ),
             ),
           ),
+          if (cancellationPending || cancellationRequesting) ...[
+            const SizedBox(height: 12),
+            _CancellationRequestStatus(requesting: cancellationRequesting),
+          ],
           const SizedBox(height: 4),
           SizedBox(
             width: double.infinity,
             child: TextButton.icon(
-              onPressed: onReportProblem,
+              onPressed: cancellationPending || cancellationRequesting
+                  ? null
+                  : onReportProblem,
               icon: Icon(
-                Icons.cancel_outlined,
-                color: Colors.red.shade400,
+                cancellationPending
+                    ? Icons.hourglass_top_rounded
+                    : Icons.cancel_outlined,
+                color: cancellationPending || cancellationRequesting
+                    ? AppColors.textSecondary
+                    : Colors.red.shade400,
                 size: 16,
               ),
               label: Text(
-                'Cancelar corrida',
+                cancellationRequesting
+                    ? 'Enviando solicitação...'
+                    : cancellationPending
+                    ? 'Cancelamento em análise'
+                    : 'Solicitar cancelamento',
                 style: TextStyle(
-                  color: Colors.red.shade400,
+                  color: cancellationPending || cancellationRequesting
+                      ? AppColors.textSecondary
+                      : Colors.red.shade400,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -308,7 +388,10 @@ class ArrivedAtClientPanel extends StatelessWidget {
   final VoidCallback onStart;
   final VoidCallback onCall;
   final VoidCallback onChat;
+  final VoidCallback onSupportChat;
   final VoidCallback onReportProblem;
+  final bool cancellationPending;
+  final bool cancellationRequesting;
 
   const ArrivedAtClientPanel({
     super.key,
@@ -316,7 +399,10 @@ class ArrivedAtClientPanel extends StatelessWidget {
     required this.onStart,
     required this.onCall,
     required this.onChat,
+    required this.onSupportChat,
     required this.onReportProblem,
+    this.cancellationPending = false,
+    this.cancellationRequesting = false,
   });
 
   @override
@@ -391,6 +477,26 @@ class ArrivedAtClientPanel extends StatelessWidget {
             icon: Icons.attach_money,
             label: 'R\$ ${trip.offeredPrice.toStringAsFixed(2)}',
           ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: onSupportChat,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textPrimary,
+                side: const BorderSide(color: Color(0xFFD8DCE2)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: const Icon(Icons.support_agent_rounded, size: 18),
+              label: const Text(
+                'Chat com a KZ',
+                style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 13),
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
           Row(
             children: [
@@ -455,24 +561,102 @@ class ArrivedAtClientPanel extends StatelessWidget {
               ),
             ],
           ),
+          if (cancellationPending || cancellationRequesting) ...[
+            const SizedBox(height: 12),
+            _CancellationRequestStatus(requesting: cancellationRequesting),
+          ],
           const SizedBox(height: 4),
           SizedBox(
             width: double.infinity,
             child: TextButton.icon(
-              onPressed: onReportProblem,
+              onPressed: cancellationPending || cancellationRequesting
+                  ? null
+                  : onReportProblem,
               icon: Icon(
-                Icons.cancel_outlined,
-                color: Colors.red.shade400,
+                cancellationPending
+                    ? Icons.hourglass_top_rounded
+                    : Icons.cancel_outlined,
+                color: cancellationPending || cancellationRequesting
+                    ? AppColors.textSecondary
+                    : Colors.red.shade400,
                 size: 16,
               ),
               label: Text(
-                'Cancelar corrida',
+                cancellationRequesting
+                    ? 'Enviando solicitação...'
+                    : cancellationPending
+                    ? 'Cancelamento em análise'
+                    : 'Solicitar cancelamento',
                 style: TextStyle(
-                  color: Colors.red.shade400,
+                  color: cancellationPending || cancellationRequesting
+                      ? AppColors.textSecondary
+                      : Colors.red.shade400,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CancellationRequestStatus extends StatelessWidget {
+  final bool requesting;
+
+  const _CancellationRequestStatus({required this.requesting});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7E0),
+        border: Border.all(color: const Color(0xFFE8B931)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (requesting)
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            const Icon(
+              Icons.hourglass_top_rounded,
+              size: 20,
+              color: Color(0xFF8A6500),
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  requesting
+                      ? 'Enviando solicitação'
+                      : 'Cancelamento em análise',
+                  style: const TextStyle(
+                    fontFamily: 'OutfitBlack',
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'A corrida continua ativa até a resposta da KZ.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

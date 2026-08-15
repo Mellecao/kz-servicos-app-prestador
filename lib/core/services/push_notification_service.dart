@@ -179,6 +179,11 @@ class PushNotificationService {
             ? '${clientName.isNotEmpty ? clientName : 'Um passageiro'} solicitou uma corrida de $pickup para $destination.'
             : '${clientName.isNotEmpty ? clientName : 'Um passageiro'} solicitou uma nova corrida.',
       ),
+      'scheduled_direct_request' => TripNotificationContent(
+        title: 'Nova solicitação de corrida!',
+        body:
+            '${clientName.isNotEmpty ? clientName : 'Um cliente'} escolheu você para uma viagem. Informe o seu valor.',
+      ),
       'recheck' ||
       'awaiting_driver_confirmation' ||
       'passenger_accepted_trip' ||
@@ -358,7 +363,8 @@ class PushNotificationService {
       return '/schedules?tripId=${Uri.encodeComponent(tripId)}';
     }
     final type = '${data['type'] ?? data['event'] ?? ''}';
-    if ((type == 'scheduled_direct_request' || type == 'scheduled_direct_confirmed') &&
+    if ((type == 'scheduled_direct_request' ||
+            type == 'scheduled_direct_confirmed') &&
         tripId.isNotEmpty) {
       return '/schedules?tripId=${Uri.encodeComponent(tripId)}';
     }

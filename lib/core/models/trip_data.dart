@@ -77,6 +77,14 @@ class TripData {
 
   bool get isFlash => tripType == 'flash';
 
+  bool get isScheduledDirectRequest =>
+      tripType == 'scheduled_choose_driver' &&
+      status == 'awaiting_driver_confirmation' &&
+      candidateStatus != 'accepted';
+
+  bool get isDriverRecheck =>
+      status == 'awaiting_driver_confirmation' && !isScheduledDirectRequest;
+
   double get price =>
       finalPrice ?? offeredPrice ?? kzProposedPrice ?? estimatedPrice ?? 0;
 
@@ -167,6 +175,7 @@ class TripData {
 
   String get statusLabel {
     if (isAwaitingKzApproval) return 'Aguardando aprovação da KZ';
+    if (isScheduledDirectRequest) return 'Aguardando proposta do motorista';
     return switch (status) {
       'open' => 'Aberta',
       'under_review' => 'Em análise',
@@ -225,11 +234,24 @@ class TripData {
       rating = (ratingsRaw['score'] as num?)?.toDouble();
     }
 
+    // Quando a trip vem de um select feito a partir de `trips` (em vez de
+    // `trip_driver_candidates`), o status da candidatura do motorista chega
+    // embutido em `trip_driver_candidates` em vez da chave plana
+    // `candidate_status`.
+    final rawTripDriverCandidates = map['trip_driver_candidates'];
+    String? embeddedCandidateStatus;
+    if (rawTripDriverCandidates is List &&
+        rawTripDriverCandidates.isNotEmpty) {
+      final first = rawTripDriverCandidates.first;
+      if (first is Map) embeddedCandidateStatus = first['status'] as String?;
+    }
+
     return TripData(
       tripId: map['id'] as String,
       candidateId: map['candidate_id'] as String? ?? '',
       clientId: map['client_id'] as String?,
-      candidateStatus: map['candidate_status'] as String?,
+      candidateStatus:
+          map['candidate_status'] as String? ?? embeddedCandidateStatus,
       clientName: clientMap['full_name'] as String? ?? 'Cliente',
       clientPhone: clientMap['phone'] as String?,
       clientAvatarUrl: clientMap['avatar_url'] as String?,

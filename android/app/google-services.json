@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "332846119947",
-    "project_id": "kz-notifica",
-    "storage_bucket": "kz-notifica.firebasestorage.app"
+    "project_number": "273099983865",
+    "project_id": "kz-app-511e0",
+    "storage_bucket": "kz-app-511e0.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:332846119947:android:02998fa1b10d9beefa5b0e",
+        "mobilesdk_app_id": "1:273099983865:android:999159b4587abcfaad0b28",
         "android_client_info": {
           "package_name": "com.kzservicos.kz_servicos_prestador"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCGoTuYhkDEkq_DWXg7_kH2sfyRIPpnf3Y"
+          "current_key": "AIzaSyDrcWCbFgo529ZSe6r1-M83mS6LQ3o7klo"
         }
       ],
       "services": {

@@ -14,6 +14,7 @@ class ServiceProviderBottomNav extends StatelessWidget {
   static const _items = [
     (icon: Icons.handyman_rounded, label: 'Serviços'),
     (icon: Icons.account_balance_wallet_rounded, label: 'Carteira'),
+    (icon: Icons.card_giftcard_rounded, label: 'Benefícios'),
     (icon: Icons.person_rounded, label: 'Perfil'),
   ];
 

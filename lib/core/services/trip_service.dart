@@ -6,13 +6,14 @@ import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data
 const _tripSelect =
     '*, pickup_address:addresses!pickup_address_id(formatted_address,latitude,longitude), '
     'dropoff_address:addresses!dropoff_address_id(formatted_address,latitude,longitude), '
-    'client:users!client_id(full_name,phone,avatar_url)';
+    'client:users!client_id(full_name,phone,avatar_url), '
+    'trip_stops(*, addresses(*))';
 
 const _tripDetailSelect =
     '*, pickup_address:addresses!pickup_address_id(formatted_address,latitude,longitude), '
     'dropoff_address:addresses!dropoff_address_id(formatted_address,latitude,longitude), '
     'client:users!client_id(full_name,phone,avatar_url), '
-    'trip_children(*), trip_luggage(*)';
+    'trip_children(*), trip_luggage(*), trip_stops(*, addresses(*))';
 
 const _tripHistorySelect =
     '*, pickup_address:addresses!pickup_address_id(formatted_address,latitude,longitude), '
@@ -24,10 +25,13 @@ const _activeTripSelect =
     '*, pickup_address:addresses!pickup_address_id(formatted_address,latitude,longitude), '
     'dropoff_address:addresses!dropoff_address_id(formatted_address,latitude,longitude), '
     'client:users!client_id(full_name,phone,avatar_url), '
-    'trip_driver_candidates(id, offered_price, status, price_rejection_reason, kz_proposed_price, kz_proposal_locked)';
+    'trip_driver_candidates(id, offered_price, status, price_rejection_reason, kz_proposed_price, kz_proposal_locked), '
+    'trip_stops(*, addresses(*))';
 
 const _candidateFields =
     'id, status, offered_price, price_rejection_reason, kz_proposed_price, kz_proposal_locked';
+
+enum CandidatePriceUpdateResult { success, notEditable, failure }
 
 class TripService {
   final SupabaseClient _client = Supabase.instance.client;
@@ -109,6 +113,23 @@ class TripService {
     double? offeredPrice,
   }) async {
     try {
+      final activeTrip = await getCurrentActiveTrip(driverProfileId);
+      if (activeTrip != null) {
+        final trip = await _client
+            .from('trips')
+            .select('scheduled_datetime')
+            .eq('id', tripId)
+            .maybeSingle();
+        final scheduled = trip?['scheduled_datetime'] == null
+            ? null
+            : DateTime.tryParse(trip!['scheduled_datetime'].toString());
+        if (scheduled == null || !scheduled.isAfter(DateTime.now())) {
+          debugPrint(
+            '[TripService] convite imediato bloqueado durante corrida ativa',
+          );
+          return false;
+        }
+      }
       final updateMap = <String, dynamic>{
         'status': 'accepted',
         'responded_at': DateTime.now().toIso8601String(),
@@ -123,6 +144,40 @@ class TripService {
     } catch (e) {
       debugPrint('[TripService] acceptCandidate erro: $e');
       return false;
+    }
+  }
+
+  Future<CandidatePriceUpdateResult> updateCandidateOfferedPrice({
+    required String tripId,
+    required String driverProfileId,
+    required double offeredPrice,
+    String? candidateId,
+  }) async {
+    try {
+      final trip = await _client
+          .from('trips')
+          .select('status')
+          .eq('id', tripId)
+          .maybeSingle();
+      if (trip == null || trip['status'] != 'searching_drivers') {
+        return CandidatePriceUpdateResult.notEditable;
+      }
+
+      var query = _client
+          .from('trip_driver_candidates')
+          .update({'offered_price': offeredPrice})
+          .eq('trip_id', tripId)
+          .eq('driver_profile_id', driverProfileId)
+          .eq('status', 'accepted');
+      final candidate = candidateId?.trim();
+      if (candidate != null && candidate.isNotEmpty) {
+        query = query.eq('id', candidate);
+      }
+      await query;
+      return CandidatePriceUpdateResult.success;
+    } catch (e) {
+      debugPrint('[TripService] updateCandidateOfferedPrice erro: $e');
+      return CandidatePriceUpdateResult.failure;
     }
   }
 
@@ -155,8 +210,9 @@ class TripService {
     try {
       final res = await _client
           .from('trips')
-          .select(_tripSelect)
+          .select('$_tripSelect, trip_driver_candidates!inner(status)')
           .eq('driver_profile_id', driverProfileId)
+          .eq('trip_driver_candidates.driver_profile_id', driverProfileId)
           .inFilter('status', [
             'awaiting_driver_confirmation',
             'awaiting_client_confirmation',
@@ -165,6 +221,7 @@ class TripService {
           .order('scheduled_datetime');
       return (res as List)
           .map((m) => TripData.fromMap(m as Map<String, dynamic>))
+          .where((trip) => !trip.isScheduledDirectRequest)
           .toList();
     } catch (e) {
       debugPrint('[TripService] getDriverScheduledTrips erro: $e');
@@ -179,8 +236,9 @@ class TripService {
     try {
       final res = await _client
           .from('trips')
-          .select(_tripSelect)
+          .select('$_tripSelect, trip_driver_candidates!inner(status)')
           .eq('driver_profile_id', driverProfileId)
+          .eq('trip_driver_candidates.driver_profile_id', driverProfileId)
           .eq('status', 'awaiting_driver_confirmation')
           .order('scheduled_datetime');
       return (res as List)
@@ -197,12 +255,25 @@ class TripService {
     try {
       await _client
           .from('trips')
-          .update({'status': 'started'})
+          .update({'status': 'started', 'execution_stage': 'to_pickup'})
           .eq('id', tripId);
       return true;
     } catch (e) {
       debugPrint('[TripService] startTrip erro: $e');
       return false;
+    }
+  }
+
+  Future<String?> advanceTripExecution(String tripId) async {
+    try {
+      return await _client.rpc(
+            'advance_trip_execution',
+            params: {'p_trip_id': tripId},
+          )
+          as String?;
+    } catch (e) {
+      debugPrint('[TripService] advanceTripExecution erro: $e');
+      return null;
     }
   }
 

@@ -13,7 +13,7 @@ import 'package:kz_servicos_prestador/routes/app_router.dart';
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (kIsWeb) return;
 
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await PushNotificationService.showTripNotificationFromBackgroundMessage(
     message,
   );
@@ -25,7 +25,9 @@ void main() async {
   if (!kIsWeb) {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    await PushNotificationService.initialize();
+    await PushNotificationService.initialize(
+      onOpenLocation: AppRouter.openPushLocation,
+    );
   } else {
     debugPrint(
       'Firebase web não inicializado: configure lib/firebase_options.dart '

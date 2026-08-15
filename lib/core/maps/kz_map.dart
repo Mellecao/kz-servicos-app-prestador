@@ -49,6 +49,7 @@ class KzMap extends StatefulWidget {
   final ValueChanged<gm.CameraPosition>? onCameraMove;
   final VoidCallback? onCameraIdle;
   final String? style;
+  final EdgeInsets padding;
   final bool zoomControlsEnabled;
   final bool scrollGesturesEnabled;
   final bool rotateGesturesEnabled;
@@ -66,7 +67,8 @@ class KzMap extends StatefulWidget {
     this.onCameraMoveStarted,
     this.onCameraMove,
     this.onCameraIdle,
-    this.style,
+    this.style = MapStyles.standard,
+    this.padding = EdgeInsets.zero,
     this.zoomControlsEnabled = true,
     this.scrollGesturesEnabled = true,
     this.rotateGesturesEnabled = true,
@@ -119,6 +121,7 @@ class _KzMapState extends State<KzMap> {
       onCameraMove: widget.onCameraMove,
       onCameraIdle: widget.onCameraIdle,
       style: _effectiveGoogleStyle,
+      padding: widget.padding,
       zoomControlsEnabled: widget.zoomControlsEnabled,
       scrollGesturesEnabled: widget.scrollGesturesEnabled,
       rotateGesturesEnabled: widget.rotateGesturesEnabled,
@@ -130,7 +133,7 @@ class _KzMapState extends State<KzMap> {
   }
 
   String? get _effectiveGoogleStyle {
-    if (widget.style == MapStyles.standard) return _loadedStyle;
+    if (widget.style == MapStyles.standard) return _loadedStyle ?? '[]';
     return widget.style;
   }
 }

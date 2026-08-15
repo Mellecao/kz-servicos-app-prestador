@@ -121,46 +121,38 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomPad = MediaQuery.of(context).padding.bottom;
-
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          SafeArea(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: _load,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPad + 100),
-                      child: Column(
-                        children: [
-                          _buildHeader(),
-                          const SizedBox(height: 24),
-                          _buildOnlineStatus(),
-                          const SizedBox(height: 16),
-                          _buildStatsRow(),
-                          const SizedBox(height: 24),
-                          _buildCategoriesSection(),
-                          const SizedBox(height: 16),
-                          _buildMenuItems(),
-                        ],
-                      ),
-                    ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+        child: ServiceProviderBottomNav(
+          selectedIndex: 3,
+          onItemSelected: widget.onNavTap,
+        ),
+      ),
+      body: SafeArea(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _load,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                  child: Column(
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 24),
+                      _buildOnlineStatus(),
+                      const SizedBox(height: 16),
+                      _buildStatsRow(),
+                      const SizedBox(height: 24),
+                      _buildCategoriesSection(),
+                      const SizedBox(height: 16),
+                      _buildMenuItems(),
+                    ],
                   ),
-          ),
-          Positioned(
-            bottom: bottomPad + 12,
-            left: 24,
-            right: 24,
-            child: ServiceProviderBottomNav(
-              selectedIndex: 2,
-              onItemSelected: widget.onNavTap,
-            ),
-          ),
-        ],
+                ),
+              ),
       ),
     );
   }
@@ -490,7 +482,7 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
           _MenuItem(
             icon: Icons.card_giftcard_rounded,
             label: 'Clube de benefícios',
-            onTap: () => context.push('/benefits'),
+            onTap: () => context.go('/provider-benefits'),
           ),
           _MenuItem(
             icon: Icons.security_outlined,

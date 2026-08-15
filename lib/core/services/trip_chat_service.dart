@@ -228,7 +228,11 @@ class TripChatService {
         .stream(primaryKey: ['id'])
         .eq('chat_room_id', roomId)
         .order('created_at')
-        .map((rows) => rows.map(ChatMessageData.fromMap).toList());
+        .map((rows) {
+          final messages = rows.map(ChatMessageData.fromMap).toList()
+            ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+          return messages;
+        });
   }
 
   Future<void> markMessagesRead(String roomId, String userId) async {

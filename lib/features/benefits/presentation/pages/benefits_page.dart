@@ -7,7 +7,9 @@ import 'package:kz_servicos_prestador/features/benefits/data/services/benefits_s
 import 'package:url_launcher/url_launcher.dart';
 
 class BenefitsPage extends StatefulWidget {
-  const BenefitsPage({super.key});
+  final Widget? bottomNavigationBar;
+
+  const BenefitsPage({super.key, this.bottomNavigationBar});
 
   @override
   State<BenefitsPage> createState() => _BenefitsPageState();
@@ -34,6 +36,7 @@ class _BenefitsPageState extends State<BenefitsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      bottomNavigationBar: widget.bottomNavigationBar,
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
@@ -63,7 +66,8 @@ class _BenefitsPageState extends State<BenefitsPage> {
                     horizontalPadding,
                     16,
                     horizontalPadding,
-                    MediaQuery.of(context).padding.bottom + 24,
+                    MediaQuery.of(context).padding.bottom +
+                        (widget.bottomNavigationBar == null ? 24 : 112),
                   ),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,

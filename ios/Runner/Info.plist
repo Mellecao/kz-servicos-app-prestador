@@ -49,6 +49,23 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Usamos sua localização precisa para guiar a corrida em andamento e atualizar o passageiro.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Usamos sua localização durante corridas para manter a navegação e o acompanhamento do passageiro.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Usamos sua localização durante corridas para manter a navegação e o acompanhamento do passageiro.</string>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>Navigation</key>
+		<string>Ative a localização precisa para mostrar o motorista na rua correta durante a navegação.</string>
+	</dict>
+	<key>NSMotionUsageDescription</key>
+	<string>Usamos os sensores do aparelho para orientar a bússola e a visão 3D do mapa durante a navegação.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

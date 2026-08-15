@@ -62,37 +62,49 @@ class ActiveTripNavigationDrawer extends StatelessWidget {
               ),
             ),
             const Divider(height: 1),
-            _DrawerItem(
-              icon: Icons.calendar_month_outlined,
-              label: 'Agendamentos',
-              route: '/schedules',
-              onSelectRoute: onSelectRoute,
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  _DrawerItem(
+                    icon: Icons.home_outlined,
+                    label: 'Início',
+                    route: '/home',
+                    onSelectRoute: onSelectRoute,
+                  ),
+                  _DrawerItem(
+                    icon: Icons.calendar_month_outlined,
+                    label: 'Agendamentos',
+                    route: '/schedules',
+                    onSelectRoute: onSelectRoute,
+                  ),
+                  _DrawerItem(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Carteira',
+                    route: '/earnings',
+                    onSelectRoute: onSelectRoute,
+                  ),
+                  _DrawerItem(
+                    icon: Icons.person_outline,
+                    label: 'Perfil',
+                    route: '/profile',
+                    onSelectRoute: onSelectRoute,
+                  ),
+                  _DrawerItem(
+                    icon: Icons.chat_bubble_outline,
+                    label: 'Mensagens',
+                    route: '/messages',
+                    onSelectRoute: onSelectRoute,
+                  ),
+                  _DrawerItem(
+                    icon: Icons.history_outlined,
+                    label: 'Histórico de corridas',
+                    route: '/trip-history',
+                    onSelectRoute: onSelectRoute,
+                  ),
+                ],
+              ),
             ),
-            _DrawerItem(
-              icon: Icons.account_balance_wallet_outlined,
-              label: 'Carteira',
-              route: '/earnings',
-              onSelectRoute: onSelectRoute,
-            ),
-            _DrawerItem(
-              icon: Icons.person_outline,
-              label: 'Perfil',
-              route: '/profile',
-              onSelectRoute: onSelectRoute,
-            ),
-            _DrawerItem(
-              icon: Icons.chat_bubble_outline,
-              label: 'Mensagens',
-              route: '/messages',
-              onSelectRoute: onSelectRoute,
-            ),
-            _DrawerItem(
-              icon: Icons.history_outlined,
-              label: 'Histórico de corridas',
-              route: '/trip-history',
-              onSelectRoute: onSelectRoute,
-            ),
-            const Spacer(),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               child: SizedBox(

@@ -10,7 +10,7 @@ class DriverService {
       final res = await _client
           .from('users')
           .select(
-            '*, provider_profiles(*, driver_profiles(*, vehicles(*)))',
+            '*, provider_profiles(*, driver_profiles(*, driver_profile_photos(*), vehicles(*, vehicle_photos(*))))',
           )
           .eq('id', userId)
           .single();
@@ -31,6 +31,26 @@ class DriverService {
       return true;
     } catch (e) {
       debugPrint('[DriverService] updateAvailability erro: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteDriverProfilePhoto(String photoId) async {
+    try {
+      await _client.from('driver_profile_photos').delete().eq('id', photoId);
+      return true;
+    } catch (e) {
+      debugPrint('[DriverService] deleteDriverProfilePhoto erro: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteVehiclePhoto(String photoId) async {
+    try {
+      await _client.from('vehicle_photos').delete().eq('id', photoId);
+      return true;
+    } catch (e) {
+      debugPrint('[DriverService] deleteVehiclePhoto erro: $e');
       return false;
     }
   }

@@ -17,6 +17,14 @@ void main() {
       expect(redirect, isNull);
     });
 
+    test('does not redirect home opened as active trip overview', () {
+      final redirect = AppRouter.activeTripHomeRedirect(
+        Uri.parse('/home?activeTripId=trip-123'),
+      );
+
+      expect(redirect, isNull);
+    });
+
     test('does not redirect other active-trip-aware tabs', () {
       final redirect = AppRouter.activeTripHomeRedirect(
         Uri.parse('/schedules?returnToActiveTripId=trip-123'),

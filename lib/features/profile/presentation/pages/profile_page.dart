@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
@@ -28,6 +29,8 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isUploadingPhoto = false;
   bool _isUploadingVehiclePhoto = false;
   bool _isUploadingDriverPhoto = false;
+  bool _isSavingAvailability = false;
+  String? _deletingPhotoId;
 
   @override
   void initState() {
@@ -184,6 +187,7 @@ class _ProfilePageState extends State<ProfilePage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Foto do carro enviada.')));
+        await _load();
       }
     } catch (e) {
       debugPrint('[KZ] vehicle photo upload erro: $e');
@@ -257,6 +261,7 @@ class _ProfilePageState extends State<ProfilePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Foto do motorista enviada.')),
         );
+        await _load();
       }
     } catch (e) {
       debugPrint('[KZ] driver photo upload erro: $e');
@@ -268,6 +273,131 @@ class _ProfilePageState extends State<ProfilePage> {
     } finally {
       if (mounted) setState(() => _isUploadingDriverPhoto = false);
     }
+  }
+
+  Future<void> _onAvailabilityChanged(bool value) async {
+    final driverProfileId = _profile?.driverProfileId;
+    if (driverProfileId == null || driverProfileId.isEmpty) return;
+
+    if (value) {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (!serviceEnabled ||
+          permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever ||
+          permission == LocationPermission.whileInUse) {
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Ative a localização em segundo plano'),
+            content: const Text('Para aparecer como motorista próximo mesmo com o aplicativo em segundo plano, permita a localização precisa e escolha “Sempre” nas configurações do aplicativo.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Agora não')),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await Geolocator.openAppSettings();
+                },
+                child: const Text('Abrir configurações'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
+
+    setState(() => _isSavingAvailability = true);
+    final ok = await _driverService.updateAvailability(driverProfileId, value);
+    if (!mounted) return;
+
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erro ao atualizar disponibilidade. Tente novamente.'),
+        ),
+      );
+    }
+    await _load();
+    if (mounted) setState(() => _isSavingAvailability = false);
+  }
+
+  Future<void> _onRemoveDriverPhoto(ProfilePhotoData photo) async {
+    final confirmed = await _confirmPhotoRemoval('Remover foto do motorista?');
+    if (!confirmed || !mounted) return;
+    setState(() => _deletingPhotoId = photo.id);
+    final ok = await _driverService.deleteDriverProfilePhoto(photo.id);
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erro ao remover foto do motorista.')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Foto do motorista removida.')),
+      );
+      await _load();
+    }
+    if (mounted) setState(() => _deletingPhotoId = null);
+  }
+
+  Future<void> _onRemoveVehiclePhoto(ProfilePhotoData photo) async {
+    final confirmed = await _confirmPhotoRemoval('Remover foto do carro?');
+    if (!confirmed || !mounted) return;
+    setState(() => _deletingPhotoId = photo.id);
+    final ok = await _driverService.deleteVehiclePhoto(photo.id);
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erro ao remover foto do carro.')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Foto do carro removida.')),
+      );
+      await _load();
+    }
+    if (mounted) setState(() => _deletingPhotoId = null);
+  }
+
+  Future<bool> _confirmPhotoRemoval(String title) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(
+              title,
+              style: const TextStyle(fontFamily: 'OutfitBlack', fontSize: 18),
+            ),
+            content: const Text(
+              'Essa ação remove a foto do perfil público.',
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text(
+                  'Cancelar',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(
+                  'Remover',
+                  style: TextStyle(
+                    color: Colors.red.shade400,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   @override
@@ -329,6 +459,12 @@ class _ProfilePageState extends State<ProfilePage> {
                                   ? null
                                   : _onAddVehiclePhoto,
                             ),
+                            _PhotoGrid(
+                              photos: _profile?.vehicle?.photos ?? const [],
+                              emptyText: 'Nenhuma foto do carro enviada.',
+                              deletingPhotoId: _deletingPhotoId,
+                              onRemove: _onRemoveVehiclePhoto,
+                            ),
                           ]),
                           const SizedBox(height: 16),
                           _buildSection('Fotos do motorista', [
@@ -340,6 +476,12 @@ class _ProfilePageState extends State<ProfilePage> {
                               onTap: _isUploadingDriverPhoto
                                   ? null
                                   : _onAddDriverPhoto,
+                            ),
+                            _PhotoGrid(
+                              photos: _profile?.driverPhotos ?? const [],
+                              emptyText: 'Nenhuma foto do motorista enviada.',
+                              deletingPhotoId: _deletingPhotoId,
+                              onRemove: _onRemoveDriverPhoto,
                             ),
                           ]),
                           const SizedBox(height: 16),
@@ -477,7 +619,6 @@ class _ProfilePageState extends State<ProfilePage> {
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             width: 10,
@@ -490,15 +631,35 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            isAvailable ? 'Online' : 'Offline',
-            style: TextStyle(
-              fontFamily: 'OutfitBlack',
-              fontSize: 14,
-              color: isAvailable
-                  ? const Color(0xFF2ECC71)
-                  : Colors.red.shade400,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isAvailable ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    fontFamily: 'OutfitBlack',
+                    fontSize: 14,
+                    color: isAvailable
+                        ? const Color(0xFF2ECC71)
+                        : Colors.red.shade400,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Controle sua disponibilidade para receber corridas.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
+          ),
+          Switch(
+            value: isAvailable,
+            activeThumbColor: const Color(0xFF2ECC71),
+            onChanged: _isSavingAvailability ? null : _onAvailabilityChanged,
           ),
         ],
       ),
@@ -827,6 +988,100 @@ class _ActionRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PhotoGrid extends StatelessWidget {
+  final List<ProfilePhotoData> photos;
+  final String emptyText;
+  final String? deletingPhotoId;
+  final ValueChanged<ProfilePhotoData> onRemove;
+
+  const _PhotoGrid({
+    required this.photos,
+    required this.emptyText,
+    required this.deletingPhotoId,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (photos.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          emptyText,
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: photos.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+        ),
+        itemBuilder: (context, index) {
+          final photo = photos[index];
+          final deleting = deletingPhotoId == photo.id;
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    photo.url,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      color: const Color(0xFFF1F2F4),
+                      child: const Icon(
+                        Icons.broken_image_outlined,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Material(
+                  color: Colors.red.shade400,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: deleting ? null : () => onRemove(photo),
+                    child: SizedBox(
+                      width: 30,
+                      height: 30,
+                      child: deleting
+                          ? const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.delete_outline,
+                              color: Colors.white,
+                              size: 17,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

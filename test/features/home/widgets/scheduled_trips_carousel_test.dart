@@ -69,13 +69,19 @@ void main() {
       await tester.pumpWidget(
         buildCarousel([makeTrip('1', 'scheduled'), makeTrip('2', 'scheduled')]),
       );
-      // Dots container deve aparecer
-      expect(find.byType(AnimatedContainer), findsWidgets);
+      expect(
+        find.byKey(const ValueKey('scheduled_trip_dot_0')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('scheduled_trip_dot_1')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('não exibe dots quando há apenas uma corrida', (tester) async {
       await tester.pumpWidget(buildCarousel([makeTrip('1', 'scheduled')]));
-      expect(find.byType(AnimatedContainer), findsNothing);
+      expect(find.byKey(const ValueKey('scheduled_trip_dot_0')), findsNothing);
     });
 
     testWidgets('chama onTap ao tocar no card', (tester) async {

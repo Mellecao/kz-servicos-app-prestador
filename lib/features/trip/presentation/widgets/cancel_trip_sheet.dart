@@ -50,7 +50,7 @@ class _CancelTripSheetState extends State<CancelTripSheet> {
             ),
             const SizedBox(height: 20),
             const Text(
-              'Cancelar corrida',
+              'Solicitar cancelamento',
               style: TextStyle(
                 fontFamily: 'OutfitBlack',
                 fontSize: 20,
@@ -59,7 +59,7 @@ class _CancelTripSheetState extends State<CancelTripSheet> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'Descreva o motivo do cancelamento (mínimo 10 caracteres).',
+              'Descreva o motivo (mínimo 10 caracteres). A corrida continuará ativa até a resposta da KZ.',
               style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
@@ -79,8 +79,10 @@ class _CancelTripSheetState extends State<CancelTripSheet> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      BorderSide(color: Colors.red.shade600, width: 1.5),
+                  borderSide: BorderSide(
+                    color: Colors.red.shade600,
+                    width: 1.5,
+                  ),
                 ),
                 contentPadding: const EdgeInsets.all(14),
               ),
@@ -106,7 +108,7 @@ class _CancelTripSheetState extends State<CancelTripSheet> {
                   ),
                 ),
                 child: const Text(
-                  'Confirmar cancelamento',
+                  'Enviar solicitação',
                   style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 16),
                 ),
               ),

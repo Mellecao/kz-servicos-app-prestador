@@ -8,12 +8,22 @@ class TripRequestCard extends StatefulWidget {
   final TripData request;
   final void Function(double? price) onAccept;
   final VoidCallback onReject;
+  final VoidCallback onShowDetails;
+  final ValueChanged<bool>? onPriceFieldFocusChanged;
+  final bool reduceEffects;
+  final bool compact;
+  final bool showDetailsButton;
 
   const TripRequestCard({
     super.key,
     required this.request,
     required this.onAccept,
     required this.onReject,
+    required this.onShowDetails,
+    this.onPriceFieldFocusChanged,
+    this.reduceEffects = false,
+    this.compact = false,
+    this.showDetailsButton = true,
   });
 
   @override
@@ -23,6 +33,7 @@ class TripRequestCard extends StatefulWidget {
 class _TripRequestCardState extends State<TripRequestCard>
     with SingleTickerProviderStateMixin {
   final _priceController = TextEditingController();
+  final _priceFocusNode = FocusNode();
   bool _showError = false;
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
@@ -38,6 +49,11 @@ class _TripRequestCardState extends State<TripRequestCard>
     _shakeAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _shakeController, curve: Curves.elasticOut),
     );
+    _priceFocusNode.addListener(_notifyPriceFieldFocus);
+  }
+
+  void _notifyPriceFieldFocus() {
+    widget.onPriceFieldFocusChanged?.call(_priceFocusNode.hasFocus);
   }
 
   @override
@@ -58,13 +74,16 @@ class _TripRequestCardState extends State<TripRequestCard>
 
   @override
   void dispose() {
+    _priceFocusNode.removeListener(_notifyPriceFieldFocus);
+    widget.onPriceFieldFocusChanged?.call(false);
+    _priceFocusNode.dispose();
     _priceController.dispose();
     _shakeController.dispose();
     super.dispose();
   }
 
   void _handleAccept() {
-    if (widget.request.status == 'awaiting_driver_confirmation') {
+    if (widget.request.isDriverRecheck) {
       widget.onAccept(null);
       return;
     }
@@ -88,6 +107,7 @@ class _TripRequestCardState extends State<TripRequestCard>
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = widget.compact;
     final hasRejectedPrice =
         widget.request.priceRejectionReason != null &&
         widget.request.priceRejectionReason!.isNotEmpty;
@@ -101,17 +121,19 @@ class _TripRequestCardState extends State<TripRequestCard>
         : Colors.grey.shade200;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isCompact ? 12 : 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(isCompact ? 16 : 20),
+        boxShadow: widget.reduceEffects
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -121,7 +143,7 @@ class _TripRequestCardState extends State<TripRequestCard>
           Row(
             children: [
               CircleAvatar(
-                radius: 20,
+                radius: isCompact ? 18 : 20,
                 backgroundColor: AppColors.highlight.withValues(alpha: 0.15),
                 backgroundImage:
                     widget.request.clientAvatarUrl != null &&
@@ -137,7 +159,7 @@ class _TripRequestCardState extends State<TripRequestCard>
                             : '?',
                         style: const TextStyle(
                           fontFamily: 'OutfitBlack',
-                          fontSize: 18,
+                          fontSize: 17,
                           color: AppColors.highlight,
                         ),
                       )
@@ -147,16 +169,16 @@ class _TripRequestCardState extends State<TripRequestCard>
               Expanded(
                 child: Text(
                   widget.request.clientName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'OutfitBlack',
-                    fontSize: 16,
+                    fontSize: isCompact ? 15 : 16,
                     color: AppColors.textPrimary,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isCompact ? 12 : 16),
 
           // Route
           _RoutePoint(color: AppColors.highlight, label: widget.request.origin),
@@ -170,48 +192,46 @@ class _TripRequestCardState extends State<TripRequestCard>
             isCircle: true,
           ),
 
-          if (widget.request.isRoundTrip) ...[
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.highlight.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.highlight.withValues(alpha: 0.28),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.sync_alt_rounded,
-                    size: 18,
-                    color: AppColors.highlight,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.request.returnAt == null
-                          ? 'Corrida ida e volta'
-                          : 'Corrida ida e volta • retorno ${_formatShortDateTime(widget.request.returnAt!)}',
-                      style: const TextStyle(
-                        fontFamily: 'QuasimodoSemiBold',
-                        fontSize: 13,
-                        color: AppColors.textPrimary,
-                        height: 1.25,
-                      ),
-                    ),
-                  ),
-                ],
+          SizedBox(height: isCompact ? 10 : 12),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(isCompact ? 10 : 12),
+            decoration: BoxDecoration(
+              color: AppColors.highlight.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(isCompact ? 10 : 12),
+              border: Border.all(
+                color: AppColors.highlight.withValues(alpha: 0.28),
               ),
             ),
-          ],
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  widget.request.isRoundTrip
+                      ? Icons.sync_alt_rounded
+                      : Icons.schedule_rounded,
+                  size: isCompact ? 16 : 18,
+                  color: AppColors.highlight,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _formatTripScheduleSummary(widget.request),
+                    style: TextStyle(
+                      fontFamily: 'QuasimodoSemiBold',
+                      fontSize: isCompact ? 12 : 13,
+                      color: AppColors.textPrimary,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
 
           // Extra info chips
           if (widget.request.hasChildren || widget.request.hasLuggage) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: isCompact ? 10 : 12),
             Wrap(
               spacing: 8,
               children: [
@@ -226,9 +246,33 @@ class _TripRequestCardState extends State<TripRequestCard>
             ),
           ],
 
-          const SizedBox(height: 16),
+          SizedBox(height: isCompact ? 12 : 16),
 
-          if (widget.request.status == 'awaiting_driver_confirmation') ...[
+          if (widget.showDetailsButton)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: widget.onShowDetails,
+                icon: const Icon(Icons.visibility_rounded, size: 18),
+                label: const Text(
+                  'Mostrar detalhes',
+                  style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 14),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: BorderSide(
+                    color: AppColors.highlight.withValues(alpha: 0.7),
+                  ),
+                  padding: EdgeInsets.symmetric(vertical: isCompact ? 10 : 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+          if (widget.showDetailsButton) SizedBox(height: isCompact ? 12 : 16),
+
+          if (widget.request.isDriverRecheck) ...[
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -250,7 +294,7 @@ class _TripRequestCardState extends State<TripRequestCard>
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'O passageiro aceitou sua proposta. Confirme ou recuse o agendamento.',
+                      'O passageiro confirmou a corrida. Confira os detalhes e confirme se ainda quer manter o agendamento.',
                       style: TextStyle(
                         fontFamily: 'QuasimodoSemiBold',
                         fontSize: 13,
@@ -266,7 +310,7 @@ class _TripRequestCardState extends State<TripRequestCard>
           ],
 
           // Price input with shake animation
-          if (widget.request.status != 'awaiting_driver_confirmation')
+          if (!widget.request.isDriverRecheck) ...[
             AnimatedBuilder(
               animation: _shakeAnimation,
               builder: (_, child) {
@@ -292,6 +336,7 @@ class _TripRequestCardState extends State<TripRequestCard>
                   TextField(
                     key: const Key('price_input'),
                     controller: _priceController,
+                    focusNode: _priceFocusNode,
                     enabled: !hasKzProposal,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
@@ -375,8 +420,8 @@ class _TripRequestCardState extends State<TripRequestCard>
                 ],
               ),
             ),
-
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+          ],
 
           // Action buttons
           Row(
@@ -392,14 +437,9 @@ class _TripRequestCardState extends State<TripRequestCard>
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: Text(
-                    widget.request.status == 'awaiting_driver_confirmation'
-                        ? 'Recusar'
-                        : 'Recusar solicitação',
-                    style: const TextStyle(
-                      fontFamily: 'OutfitBlack',
-                      fontSize: 14,
-                    ),
+                  child: const Text(
+                    'Recusar',
+                    style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 14),
                   ),
                 ),
               ),
@@ -417,7 +457,7 @@ class _TripRequestCardState extends State<TripRequestCard>
                     ),
                   ),
                   child: Text(
-                    widget.request.status == 'awaiting_driver_confirmation'
+                    widget.request.isDriverRecheck
                         ? 'Confirmar agendamento'
                         : 'Aceitar solicitação',
                     style: const TextStyle(
@@ -441,6 +481,14 @@ String _formatShortDateTime(DateTime value) {
   final hour = value.hour.toString().padLeft(2, '0');
   final minute = value.minute.toString().padLeft(2, '0');
   return '$day/$month às $hour:$minute';
+}
+
+String _formatTripScheduleSummary(TripData request) {
+  final departure = 'Partida ${_formatShortDateTime(request.scheduledAt)}';
+  if (!request.isRoundTrip) return departure;
+  final returnAt = request.returnAt;
+  if (returnAt == null) return '$departure • ida e volta';
+  return '$departure • Retorno ${_formatShortDateTime(returnAt)}';
 }
 
 class _RoutePoint extends StatelessWidget {

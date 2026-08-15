@@ -5,11 +5,13 @@ import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 class ScheduledTripsCarousel extends StatefulWidget {
   final List<TripData> trips;
   final void Function(TripData) onTap;
+  final void Function(TripData)? onStartTrip;
 
   const ScheduledTripsCarousel({
     super.key,
     required this.trips,
     required this.onTap,
+    this.onStartTrip,
   });
 
   @override
@@ -57,14 +59,23 @@ class _ScheduledTripsCarouselState extends State<ScheduledTripsCarousel> {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            height: 178,
+            height: 208,
             child: PageView.builder(
               controller: _pageController,
               physics: const BouncingScrollPhysics(),
               itemCount: widget.trips.length,
-              itemBuilder: (_, i) => GestureDetector(
-                onTap: () => widget.onTap(widget.trips[i]),
-                child: _TripCard(trip: widget.trips[i]),
+              itemBuilder: (_, i) => Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => widget.onTap(widget.trips[i]),
+                  child: _TripCard(
+                    trip: widget.trips[i],
+                    onStartTrip: widget.onStartTrip == null
+                        ? null
+                        : () => widget.onStartTrip!(widget.trips[i]),
+                  ),
+                ),
               ),
             ),
           ),
@@ -95,6 +106,7 @@ class _DotsIndicator extends StatelessWidget {
       children: List.generate(count, (i) {
         final isActive = i == current;
         return AnimatedContainer(
+          key: ValueKey('scheduled_trip_dot_$i'),
           duration: const Duration(milliseconds: 200),
           margin: const EdgeInsets.symmetric(horizontal: 3),
           width: isActive ? 18 : 6,
@@ -111,8 +123,9 @@ class _DotsIndicator extends StatelessWidget {
 
 class _TripCard extends StatelessWidget {
   final TripData trip;
+  final VoidCallback? onStartTrip;
 
-  const _TripCard({required this.trip});
+  const _TripCard({required this.trip, this.onStartTrip});
 
   Color get _statusColor {
     if (trip.isAwaitingKzApproval) return const Color(0xFFE65100);
@@ -330,6 +343,29 @@ class _TripCard extends StatelessWidget {
                     ),
                   ),
               ],
+            ),
+          ],
+          if (trip.status == 'scheduled' && onStartTrip != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: ElevatedButton.icon(
+                onPressed: onStartTrip,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2ECC71),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.navigation_rounded, size: 18),
+                label: const Text(
+                  'Iniciar corrida',
+                  style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 13),
+                ),
+              ),
             ),
           ],
         ],

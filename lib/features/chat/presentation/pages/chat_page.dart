@@ -89,7 +89,9 @@ class _ChatPageState extends State<ChatPage> {
           final hasNewUnread = messages.any(
             (m) => m.senderId != currentUserId && !m.isRead,
           );
-          setState(() => _messages = messages);
+          final ordered = [...messages]
+            ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+          setState(() => _messages = ordered);
           _scrollToBottom();
           if (hasNewUnread) _markRead();
         }
