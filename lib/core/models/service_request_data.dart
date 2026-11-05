@@ -1,3 +1,5 @@
+import 'package:kz_servicos_prestador/core/utils/angola_time.dart';
+
 class ServiceRequestData {
   final String id;
   final String clientName;
@@ -113,7 +115,8 @@ class ServiceRequestData {
         addr?['formatted_address'] as String?,
         map['observations'] as String?,
       ]),
-      serviceDate: DateTime.parse(
+      // `service_date` é timestamptz (UTC): mostra-se na hora de Luanda.
+      serviceDate: AngolaTime.fromBackend(
         map['service_date'] as String? ?? DateTime.now().toIso8601String(),
       ),
       estimatedPrice: (map['estimated_price'] as num?)?.toDouble(),

@@ -61,4 +61,14 @@ void main() {
   test('sem nenhuma morada mostra "-"', () {
     expect(ServiceRequestData.fromMap(base()).address, '-');
   });
+
+  test('service_date (UTC) passa para a hora de Luanda, com virada de dia', () {
+    final request = ServiceRequestData.fromMap({
+      ...base(),
+      'service_date': '2026-11-05T23:30:00.000Z',
+    });
+    expect(request.serviceDate.day, 6);
+    expect(request.serviceDate.hour, 0);
+    expect(request.serviceDate.minute, 30);
+  });
 }

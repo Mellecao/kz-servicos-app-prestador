@@ -283,4 +283,67 @@ void main() {
       );
     });
   });
+
+  group('pedido direto do cliente (client_request_service_from_provider)', () {
+    // Linha como o PostgREST a devolve para um pedido criado pela RPC:
+    // convite `pending`, pedido em `searching_provider`, sem prestador, sem
+    // address_id e sem preço.
+    Map<String, dynamic> directRow({String description = '[TESTE a5] Tomada'}) =>
+        {
+          'service_request_id': 'req-direct',
+          'status': 'pending',
+          'offered_price': null,
+          'service_requests': {
+            'id': 'req-direct',
+            'service_category_id': 'cat-1',
+            'description': description,
+            'service_date': '2026-11-05T19:07:00.123456+00:00',
+            'status': 'searching_provider',
+            'provider_profile_id': null,
+            'address_id': null,
+            'observations': null,
+            'estimated_price': null,
+            'final_price': null,
+            'is_paid': false,
+            'created_at': '2026-11-05T19:07:00.123456+00:00',
+            'service_categories': {'name': 'Eletricista'},
+            'addresses': null,
+            'client': {'full_name': 'Miguel Cliente'},
+            'service_request_photos': <dynamic>[],
+          },
+        };
+
+    test('aparece como convite normal, com o texto do cliente', () {
+      final r = ServiceRequestData.fromInviteRow(directRow())!;
+      expect(r.description, '[TESTE a5] Tomada');
+      expect(r.clientName, 'Miguel Cliente');
+      expect(r.categoryName, 'Eletricista');
+      expect(providerActionFor(r, _me), ProviderServiceAction.proposePrice);
+      expect(serviceStatusLabel(r, _me), 'Convite — proponha o seu preço');
+      expect(servicePriceLabel(r), 'Preço por propor');
+    });
+
+    test('a hora do pedido (timestamptz em UTC) sai na hora de Luanda', () {
+      final r = ServiceRequestData.fromInviteRow(directRow())!;
+      expect(r.serviceDate.hour, 20);
+      expect(r.serviceDate.minute, 7);
+    });
+  });
+
+  group('requestDescriptionMaxLines', () {
+    test('convite por responder mostra o texto do cliente completo', () {
+      expect(
+        requestDescriptionMaxLines(ProviderServiceAction.proposePrice),
+        isNull,
+      );
+    });
+
+    test('nos restantes estados o cartão resume o texto em 2 linhas', () {
+      for (final a in ProviderServiceAction.values.where(
+        (a) => a != ProviderServiceAction.proposePrice,
+      )) {
+        expect(requestDescriptionMaxLines(a), 2, reason: a.name);
+      }
+    });
+  });
 }

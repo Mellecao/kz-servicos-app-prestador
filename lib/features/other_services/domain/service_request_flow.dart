@@ -6,6 +6,12 @@ String servicePriceLabel(ServiceRequestData request) => request.displayPrice > 0
     ? formatKz(request.displayPrice)
     : 'Preço por propor';
 
+/// Linhas da descrição no cartão. Num convite por responder o texto do cliente
+/// é a única informação para fixar o preço, por isso mostra-se completo
+/// (`null` = sem limite); nos restantes estados o cartão resume em 2 linhas.
+int? requestDescriptionMaxLines(ProviderServiceAction action) =>
+    action == ProviderServiceAction.proposePrice ? null : 2;
+
 /// Ação disponível ao prestador sobre um pedido de serviço.
 ///
 /// Fluxo canónico: convite (pending) → propõe preço → o administrador escolhe

@@ -523,7 +523,7 @@ class _RequestCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             request.description,
-            maxLines: 2,
+            maxLines: requestDescriptionMaxLines(action),
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontFamily: 'QuasimodoSemiBold',
