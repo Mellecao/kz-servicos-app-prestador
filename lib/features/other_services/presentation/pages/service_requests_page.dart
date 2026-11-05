@@ -11,6 +11,7 @@ import 'package:kz_servicos_prestador/core/widgets/service_provider_bottom_nav.d
 import 'package:kz_servicos_prestador/features/benefits/presentation/widgets/benefits_banner.dart';
 import 'package:kz_servicos_prestador/features/other_services/domain/service_request_flow.dart';
 import 'package:kz_servicos_prestador/features/other_services/domain/service_request_realtime_reload_policy.dart';
+import 'package:kz_servicos_prestador/features/other_services/presentation/widgets/service_request_description.dart';
 
 class ServiceRequestsPage extends StatefulWidget {
   final ValueChanged<int> onNavTap;
@@ -521,16 +522,7 @@ class _RequestCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            request.description,
-            maxLines: requestDescriptionMaxLines(action),
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: 'QuasimodoSemiBold',
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
-          ),
+          ServiceRequestDescription(text: request.description, action: action),
           if (request.photoUrls.isNotEmpty) ...[
             const SizedBox(height: 10),
             SizedBox(
