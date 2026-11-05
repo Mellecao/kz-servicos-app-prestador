@@ -43,7 +43,7 @@ class _FlashRecheckPageState extends State<FlashRecheckPage> {
       await widget.service.recheckReject(widget.tripId);
       if (mounted) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Você desistiu desta corrida')),
+          const SnackBar(content: Text('Desistiu desta viagem')),
         );
         router.go('/home');
       }
@@ -58,13 +58,13 @@ class _FlashRecheckPageState extends State<FlashRecheckPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Cliente aceitou sua proposta!')),
+      appBar: AppBar(title: const Text('Cliente aceitou a sua proposta!')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             const Text(
-              'Deseja iniciar a corrida?',
+              'Deseja iniciar a viagem?',
               style: TextStyle(fontSize: 20),
             ),
             const Spacer(),
@@ -76,7 +76,7 @@ class _FlashRecheckPageState extends State<FlashRecheckPage> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Iniciar corrida'),
+                  : const Text('Iniciar viagem'),
             ),
             const SizedBox(height: 8),
             TextButton(

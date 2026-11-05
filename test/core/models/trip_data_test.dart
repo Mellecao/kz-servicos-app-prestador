@@ -31,35 +31,35 @@ TripData makeTrip({
 void main() {
   group('TripData.statusLabel', () {
     test(
-      'searching_drivers com candidateStatus=accepted mostra "Aguardando aprovação da KZ"',
+      'searching_drivers com candidateStatus=accepted mostra "A aguardar aprovação da Só Serviços"',
       () {
         final trip = makeTrip(
           status: 'searching_drivers',
           candidateStatus: 'accepted',
         );
-        expect(trip.statusLabel, 'Aguardando aprovação da KZ');
+        expect(trip.statusLabel, 'A aguardar aprovação da Só Serviços');
       },
     );
 
     test(
-      'searching_drivers sem candidateStatus mantém "Buscando motoristas"',
+      'searching_drivers sem candidateStatus mantém "À procura de motoristas"',
       () {
         final trip = makeTrip(status: 'searching_drivers');
-        expect(trip.statusLabel, 'Buscando motoristas');
+        expect(trip.statusLabel, 'À procura de motoristas');
       },
     );
 
     test(
-      'awaiting_client_confirmation mostra "Aguardando passageiro aceitar"',
+      'awaiting_client_confirmation mostra "A aguardar que o passageiro aceite"',
       () {
         final trip = makeTrip(status: 'awaiting_client_confirmation');
-        expect(trip.statusLabel, 'Aguardando passageiro aceitar');
+        expect(trip.statusLabel, 'A aguardar que o passageiro aceite');
       },
     );
 
     test('awaiting_driver_confirmation mostra re-check do motorista', () {
       final trip = makeTrip(status: 'awaiting_driver_confirmation');
-      expect(trip.statusLabel, 'Aguardando re-check do motorista');
+      expect(trip.statusLabel, 'A aguardar re-check do motorista');
     });
 
     test(
@@ -71,7 +71,7 @@ void main() {
           tripType: 'scheduled_choose_driver',
         );
 
-        expect(trip.statusLabel, 'Aguardando proposta do motorista');
+        expect(trip.statusLabel, 'A aguardar proposta do motorista');
       },
     );
 
@@ -84,7 +84,7 @@ void main() {
 
       expect(trip.isScheduledDirectRequest, isFalse);
       expect(trip.isDriverRecheck, isTrue);
-      expect(trip.statusLabel, 'Aguardando re-check do motorista');
+      expect(trip.statusLabel, 'A aguardar re-check do motorista');
     });
 
     test('scheduled mostra "Agendada"', () {
@@ -243,5 +243,54 @@ void main() {
         expect(trip.isDriverRecheck, isTrue);
       },
     );
+
+    test('parseia e ordena passageiros nomeados com alertas infantis', () {
+      final relationMap = Map<String, dynamic>.from(map)
+        ..['trip_passengers'] = [
+          {
+            'name': 'Carlos',
+            'age': 34,
+            'needs_car_seat': false,
+            'sort_order': 2,
+          },
+          {'name': 'Lia', 'age': 5, 'needs_car_seat': true, 'sort_order': 1},
+        ];
+
+      final trip = TripData.fromMap(relationMap);
+
+      expect(trip.passengers.map((p) => p.name), ['Lia', 'Carlos']);
+      expect(trip.passengerLabels, ['Carlos — 34 anos']);
+      expect(trip.childLabels, ['Lia — 5 anos (levar cadeirinha)']);
+      expect(trip.regularPassengerCount, 1);
+      expect(trip.displayChildrenCount, 1);
+    });
+
+    test('parseia e ordena detalhes completos de bagagem', () {
+      final relationMap = Map<String, dynamic>.from(map)
+        ..['trip_luggage'] = [
+          {
+            'type': 'carry_on',
+            'size': 'small',
+            'weight_kg': 8,
+            'quantity': 1,
+            'sort_order': 2,
+          },
+          {
+            'type': 'suitcase',
+            'size': 'large',
+            'weight_kg': 23.5,
+            'quantity': 2,
+            'sort_order': 1,
+          },
+        ];
+
+      final trip = TripData.fromMap(relationMap);
+
+      expect(trip.luggage.map((item) => item.type), ['suitcase', 'carry_on']);
+      expect(trip.luggageLabels, [
+        '2x Mala grande (23,5 kg cada)',
+        '1x Bagagem de mão pequena (8 kg)',
+      ]);
+    });
   });
 }

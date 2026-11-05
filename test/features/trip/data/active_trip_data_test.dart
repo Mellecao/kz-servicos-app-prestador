@@ -42,7 +42,7 @@ void main() {
       expect(trip.pickupAddress, 'Av. Paulista, 1000');
       expect(trip.destinationAddress, 'Aeroporto Congonhas');
       expect(trip.offeredPrice, 42.5);
-      expect(trip.paymentMethodLabel, 'PIX');
+      expect(trip.paymentMethodLabel, 'Transferência');
       expect(trip.driverArrivedAt, isNotNull);
       expect(trip.startedAt, isNull);
     });

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
+import 'package:kz_servicos_prestador/core/utils/kz_format.dart';
 
 class PendingTripRequestsCarousel extends StatefulWidget {
   final List<TripData> trips;
@@ -75,6 +76,9 @@ class _PendingTripRequestsCarouselState
 
   @override
   Widget build(BuildContext context) {
+    final showsPassengerDetails = widget.trips.any(
+      (trip) => trip.passengerLabels.isNotEmpty || trip.childLabels.isNotEmpty,
+    );
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -113,7 +117,7 @@ class _PendingTripRequestsCarouselState
           ),
           const SizedBox(height: 8),
           SizedBox(
-            height: 198,
+            height: showsPassengerDetails ? 294 : 198,
             child: PageView.builder(
               controller: _pageController,
               physics: const BouncingScrollPhysics(),
@@ -236,6 +240,21 @@ class _PendingTripCard extends StatelessWidget {
             child: Container(width: 2, height: 14, color: Colors.grey.shade300),
           ),
           _RouteLine(color: Colors.red.shade400, label: trip.destination),
+          if (trip.passengerLabels.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _CompactDetailSection(
+              title: 'Passageiros',
+              entries: trip.passengerLabels,
+            ),
+          ],
+          if (trip.childLabels.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _CompactDetailSection(
+              title: 'Crianças',
+              entries: trip.childLabels,
+              warning: true,
+            ),
+          ],
           const Spacer(),
           Row(
             children: [
@@ -249,7 +268,7 @@ class _PendingTripCard extends StatelessWidget {
               const Spacer(),
               if (price != null)
                 Text(
-                  'R\$ ${price.toStringAsFixed(2)}',
+                  formatKz(price),
                   style: const TextStyle(
                     fontFamily: 'OutfitBlack',
                     fontSize: 16,
@@ -260,6 +279,45 @@ class _PendingTripCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CompactDetailSection extends StatelessWidget {
+  final String title;
+  final List<String> entries;
+  final bool warning;
+
+  const _CompactDetailSection({
+    required this.title,
+    required this.entries,
+    this.warning = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = warning ? const Color(0xFFB45309) : AppColors.textSecondary;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            entries.join(', '),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: color, height: 1.2),
+          ),
+        ),
+      ],
     );
   }
 }

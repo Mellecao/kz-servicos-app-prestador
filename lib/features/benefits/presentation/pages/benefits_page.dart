@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:kz_servicos_prestador/core/constants/app_brand.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/features/benefits/data/models/benefit_discount_code.dart';
 import 'package:kz_servicos_prestador/features/benefits/data/models/benefit_partner.dart';
 import 'package:kz_servicos_prestador/features/benefits/data/services/benefits_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:kz_servicos_prestador/core/utils/kz_format.dart';
 
 class BenefitsPage extends StatefulWidget {
   final Widget? bottomNavigationBar;
@@ -171,7 +173,7 @@ class _BenefitCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'R\$ ${partner.discountedPrice.toStringAsFixed(2)}',
+                      formatKz(partner.discountedPrice),
                       style: const TextStyle(
                         fontFamily: 'OutfitBlack',
                         fontSize: 18,
@@ -291,7 +293,7 @@ class _BenefitDetailsSheetState extends State<_BenefitDetailsSheet> {
             const SizedBox(height: 16),
             Text(
               partner.serviceDescription.isEmpty
-                  ? 'Benefício exclusivo para parceiros KZ.'
+                  ? 'Benefício exclusivo para parceiros ${AppBrand.name}.'
                   : partner.serviceDescription,
               style: const TextStyle(
                 fontSize: 14,
@@ -303,7 +305,7 @@ class _BenefitDetailsSheetState extends State<_BenefitDetailsSheet> {
             _DetailRow(
               icon: Icons.sell_outlined,
               label:
-                  'De R\$ ${partner.originalPrice.toStringAsFixed(2)} por R\$ ${partner.discountedPrice.toStringAsFixed(2)}',
+                  'De ${formatKz(partner.originalPrice)} por ${formatKz(partner.discountedPrice)}',
             ),
             const SizedBox(height: 10),
             _DetailRow(
@@ -351,7 +353,7 @@ class _BenefitDetailsSheetState extends State<_BenefitDetailsSheet> {
                 onPressed: _generating ? null : _generateCode,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.highlight,
-                  foregroundColor: Colors.black87,
+                  foregroundColor: AppColors.onHighlight,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),

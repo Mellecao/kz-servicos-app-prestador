@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:kz_servicos_prestador/core/constants/app_brand.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/widgets/circle_button.dart';
 import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
+import 'package:kz_servicos_prestador/core/utils/kz_format.dart';
 
 class ActiveTripPanel extends StatelessWidget {
   final String clientName;
@@ -117,7 +119,7 @@ class ActiveTripPanel extends StatelessWidget {
               ),
               icon: const Icon(Icons.support_agent_rounded, size: 18),
               label: const Text(
-                'Chat com a KZ',
+                'Chat com o suporte',
                 style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 13),
               ),
             ),
@@ -188,7 +190,7 @@ class ActiveTripPanel extends StatelessWidget {
               ),
               label: Text(
                 cancellationRequesting
-                    ? 'Enviando solicitação...'
+                    ? 'A enviar solicitação...'
                     : cancellationPending
                     ? 'Cancelamento em análise'
                     : 'Solicitar cancelamento',
@@ -365,7 +367,7 @@ class _TripCompletedPanelState extends State<TripCompletedPanel> {
               onPressed: widget.onFinish,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.highlight,
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.onHighlight,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -431,7 +433,7 @@ class ArrivedAtClientPanel extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Você chegou ao local de embarque',
+            'Chegou ao local de embarque',
             style: TextStyle(
               fontFamily: 'OutfitBlack',
               fontSize: 16,
@@ -475,7 +477,7 @@ class ArrivedAtClientPanel extends StatelessWidget {
           const SizedBox(height: 6),
           _ArrivedDetailRow(
             icon: Icons.attach_money,
-            label: 'R\$ ${trip.offeredPrice.toStringAsFixed(2)}',
+            label: formatKz(trip.offeredPrice),
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -492,7 +494,7 @@ class ArrivedAtClientPanel extends StatelessWidget {
               ),
               icon: const Icon(Icons.support_agent_rounded, size: 18),
               label: const Text(
-                'Chat com a KZ',
+                'Chat com o suporte',
                 style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 13),
               ),
             ),
@@ -553,7 +555,7 @@ class ArrivedAtClientPanel extends StatelessWidget {
                       ),
                     ),
                     child: const Text(
-                      'Iniciar corrida',
+                      'Iniciar viagem',
                       style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 16),
                     ),
                   ),
@@ -583,7 +585,7 @@ class ArrivedAtClientPanel extends StatelessWidget {
               ),
               label: Text(
                 cancellationRequesting
-                    ? 'Enviando solicitação...'
+                    ? 'A enviar solicitação...'
                     : cancellationPending
                     ? 'Cancelamento em análise'
                     : 'Solicitar cancelamento',
@@ -614,8 +616,8 @@ class _CancellationRequestStatus extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7E0),
-        border: Border.all(color: const Color(0xFFE8B931)),
+        color: AppColors.highlight.withValues(alpha: 0.12),
+        border: Border.all(color: AppColors.highlight),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -631,7 +633,7 @@ class _CancellationRequestStatus extends StatelessWidget {
             const Icon(
               Icons.hourglass_top_rounded,
               size: 20,
-              color: Color(0xFF8A6500),
+              color: AppColors.onHighlight,
             ),
           const SizedBox(width: 10),
           Expanded(
@@ -640,7 +642,7 @@ class _CancellationRequestStatus extends StatelessWidget {
               children: [
                 Text(
                   requesting
-                      ? 'Enviando solicitação'
+                      ? 'A enviar solicitação'
                       : 'Cancelamento em análise',
                   style: const TextStyle(
                     fontFamily: 'OutfitBlack',
@@ -650,7 +652,7 @@ class _CancellationRequestStatus extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 const Text(
-                  'A corrida continua ativa até a resposta da KZ.',
+                  'A viagem continua ativa até à resposta da ${AppBrand.name}.',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -718,7 +720,7 @@ class PaymentCollectionPanel extends StatelessWidget {
             style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
           Text(
-            'R\$ ${price.toStringAsFixed(2).replaceAll('.', ',')}',
+            formatKz(price),
             style: const TextStyle(
               fontFamily: 'OutfitBlack',
               fontSize: 28,
@@ -733,7 +735,7 @@ class PaymentCollectionPanel extends StatelessWidget {
             ),
           ),
           Text(
-            'pelo $paymentMethodLabel',
+            'Pagamento: $paymentMethodLabel',
             style: const TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,

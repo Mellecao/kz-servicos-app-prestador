@@ -43,14 +43,17 @@ void main() {
     });
 
     testWidgets(
-      'exibe badge "Aguardando aprovação da KZ" quando candidateStatus=accepted',
+      'exibe badge "A aguardar aprovação da Só Serviços" quando candidateStatus=accepted',
       (tester) async {
         await tester.pumpWidget(
           buildCarousel([
             makeTrip('1', 'searching_drivers', candidateStatus: 'accepted'),
           ]),
         );
-        expect(find.text('Aguardando aprovação da KZ'), findsOneWidget);
+        expect(
+          find.text('A aguardar aprovação da Só Serviços'),
+          findsOneWidget,
+        );
       },
     );
 
@@ -60,7 +63,7 @@ void main() {
       await tester.pumpWidget(
         buildCarousel([makeTrip('1', 'awaiting_driver_confirmation')]),
       );
-      expect(find.text('Aguardando re-check do motorista'), findsOneWidget);
+      expect(find.text('A aguardar re-check do motorista'), findsOneWidget);
     });
 
     testWidgets('exibe dots de paginação quando há mais de uma corrida', (

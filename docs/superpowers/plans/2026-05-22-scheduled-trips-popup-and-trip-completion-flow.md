@@ -2309,7 +2309,7 @@ import 'package:http/http.dart' as http;
 import 'package:kz_servicos_prestador/features/trip/data/models/route_result.dart';
 
 class DirectionsService {
-  static const String _apiKey = 'AIzaSyChT4wSYd-b3fT7xfEvUvmgJ0QfZv7MYSE';
+  static const String _apiKey = '<GOOGLE_MAPS_API_KEY>';
 
   final http.Client _client;
 

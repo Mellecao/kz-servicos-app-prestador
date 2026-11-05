@@ -3,10 +3,13 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/constants/category_colors.dart';
+import 'package:kz_servicos_prestador/core/constants/feature_flags.dart';
 import 'package:kz_servicos_prestador/core/models/service_request_data.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/service_request_service.dart';
 import 'package:kz_servicos_prestador/core/widgets/service_provider_bottom_nav.dart';
+import 'package:kz_servicos_prestador/features/benefits/presentation/widgets/benefits_banner.dart';
+import 'package:kz_servicos_prestador/features/other_services/domain/service_request_flow.dart';
 import 'package:kz_servicos_prestador/features/other_services/domain/service_request_realtime_reload_policy.dart';
 
 class ServiceRequestsPage extends StatefulWidget {
@@ -22,10 +25,12 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
   final _service = ServiceRequestService();
   String _filter = 'Todos';
   bool _loading = true;
+  String? _error;
   List<ServiceRequestData> _requests = [];
-  final Set<String> _hiddenIds = {};
+  final Set<String> _busyIds = {};
   Set<String> _providerCategoryIds = {};
   RealtimeChannel? _serviceRequestsChannel;
+  RealtimeChannel? _candidatesChannel;
 
   @override
   void initState() {
@@ -38,27 +43,40 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
   @override
   void dispose() {
     _serviceRequestsChannel?.unsubscribe();
+    _candidatesChannel?.unsubscribe();
     super.dispose();
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
-    final providerId = AuthState.providerProfileId ?? '';
-    final result = await _service.getProviderRequests(providerId);
-    final categoryIds = await _service.getProviderCategoryIds(providerId);
-    if (!mounted) return;
     setState(() {
-      _requests = result;
-      _providerCategoryIds = categoryIds;
-      _loading = false;
+      _loading = true;
+      _error = null;
     });
+    final providerId = AuthState.providerProfileId ?? '';
+    try {
+      final result = await _service.getProviderRequests(providerId);
+      final categoryIds = await _service.getProviderCategoryIds(providerId);
+      if (!mounted) return;
+      setState(() {
+        _requests = result;
+        _providerCategoryIds = categoryIds;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Não foi possível carregar os serviços.';
+        _loading = false;
+      });
+    }
   }
 
   void _subscribeToServiceRequests() {
     final providerId = AuthState.providerProfileId;
     if (providerId == null || providerId.isEmpty) return;
+    final client = Supabase.instance.client;
     _serviceRequestsChannel?.unsubscribe();
-    _serviceRequestsChannel = Supabase.instance.client
+    _serviceRequestsChannel = client
         .channel('provider-service-requests-$providerId')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -76,37 +94,154 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
           },
         )
         .subscribe();
+
+    // Novos convites e decisões do administrador chegam por aqui.
+    _candidatesChannel?.unsubscribe();
+    _candidatesChannel = client
+        .channel('provider-service-candidates-$providerId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'service_request_provider_candidates',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'provider_profile_id',
+            value: providerId,
+          ),
+          callback: (_) => _load(),
+        )
+        .subscribe();
   }
 
   List<ServiceRequestData> get _filteredRequests {
-    final providerId = AuthState.providerProfileId;
-    final visible = _requests.where((r) => !_hiddenIds.contains(r.id)).toList();
-    if (_filter == 'Pendentes') {
-      return visible.where((r) => r.providerProfileId == null).toList();
+    if (_filter == 'Convites') {
+      return _requests.where((r) => r.providerProfileId == null).toList();
     }
-    if (_filter == 'Aceitos') {
-      return visible.where((r) => r.providerProfileId == providerId).toList();
+    if (_filter == 'Meus serviços') {
+      return _requests.where((r) => r.providerProfileId != null).toList();
     }
-    return visible;
+    return _requests;
   }
 
-  Future<void> _onAccept(ServiceRequestData request) async {
-    final providerId = AuthState.providerProfileId ?? '';
-    final ok = await _service.acceptRequest(request.id, providerId);
+  void _showMessage(String text, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'Solicitação aceita' : 'Não foi possível aceitar'),
+        content: Text(text),
+        backgroundColor: error ? Colors.red.shade700 : null,
       ),
     );
-    if (ok) await _load();
   }
 
-  void _onReject(ServiceRequestData request) {
-    setState(() => _hiddenIds.add(request.id));
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Solicitação recusada')));
+  /// Executa uma ação sobre um pedido: bloqueia cliques repetidos, mostra
+  /// erros (incluindo UPDATE que afetou 0 linhas) e recarrega a lista.
+  Future<void> _run(
+    ServiceRequestData request,
+    Future<void> Function() action,
+    String successMessage,
+  ) async {
+    if (_busyIds.contains(request.id)) return;
+    setState(() => _busyIds.add(request.id));
+    try {
+      await action();
+      _showMessage(successMessage);
+    } on ServiceActionException catch (e) {
+      _showMessage(e.message, error: true);
+    } catch (_) {
+      _showMessage('Ocorreu um erro. Tente novamente.', error: true);
+    } finally {
+      if (mounted) setState(() => _busyIds.remove(request.id));
+    }
+    await _load();
+  }
+
+  Future<void> _onPropose(ServiceRequestData request) async {
+    final price = await showDialog<double>(
+      context: context,
+      builder: (_) => _PriceProposalDialog(initial: request.estimatedPrice),
+    );
+    if (price == null) return;
+    final providerId = AuthState.providerProfileId ?? '';
+    await _run(
+      request,
+      () => _service.proposePrice(
+        requestId: request.id,
+        providerProfileId: providerId,
+        price: price,
+      ),
+      'Proposta enviada. A aguardar o administrador.',
+    );
+  }
+
+  Future<void> _onDecline(ServiceRequestData request) async {
+    final confirmed = await _confirm(
+      title: 'Recusar convite?',
+      message: 'O convite deixará de estar disponível para si.',
+      confirmLabel: 'Recusar',
+    );
+    if (confirmed != true) return;
+    final providerId = AuthState.providerProfileId ?? '';
+    await _run(
+      request,
+      () => _service.declineInvite(
+        requestId: request.id,
+        providerProfileId: providerId,
+      ),
+      'Convite recusado.',
+    );
+  }
+
+  Future<void> _onAdvance(
+    ServiceRequestData request,
+    ProviderServiceAction action,
+  ) async {
+    if (action == ProviderServiceAction.finish) {
+      final confirmed = await _confirm(
+        title: 'Concluir serviço?',
+        message: 'Confirme apenas quando o serviço estiver terminado.',
+        confirmLabel: 'Concluir',
+      );
+      if (confirmed != true) return;
+    }
+    final providerId = AuthState.providerProfileId ?? '';
+    final message = switch (action) {
+      ProviderServiceAction.confirm => 'Serviço confirmado.',
+      ProviderServiceAction.start => 'Serviço iniciado.',
+      _ => 'Serviço concluído.',
+    };
+    await _run(
+      request,
+      () => _service.advance(
+        requestId: request.id,
+        providerProfileId: providerId,
+        action: action,
+      ),
+      message,
+    );
+  }
+
+  Future<bool?> _confirm({
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -138,8 +273,11 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _buildHomeBanner(context),
-                  const SizedBox(height: 16),
+                  // Clube de benefícios desativado (ver FeatureFlags).
+                  if (FeatureFlags.benefitsClubEnabled) ...[
+                    _buildHomeBanner(context),
+                    const SizedBox(height: 16),
+                  ],
                   _buildFilterChips(),
                 ],
               ),
@@ -148,6 +286,8 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? _buildErrorState()
                   : RefreshIndicator(
                       onRefresh: _load,
                       child: _filteredRequests.isEmpty
@@ -163,18 +303,28 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
                             )
                           : ListView.builder(
                               physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.fromLTRB(
-                                24,
-                                0,
-                                24,
-                                24,
-                              ),
+                              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                               itemCount: _filteredRequests.length,
-                              itemBuilder: (_, i) => _RequestCard(
-                                request: _filteredRequests[i],
-                                onAccept: () => _onAccept(_filteredRequests[i]),
-                                onReject: () => _onReject(_filteredRequests[i]),
-                              ),
+                              itemBuilder: (_, i) {
+                                final request = _filteredRequests[i];
+                                final providerId =
+                                    AuthState.providerProfileId ?? '';
+                                return _RequestCard(
+                                  request: request,
+                                  action: providerActionFor(
+                                    request,
+                                    providerId,
+                                  ),
+                                  statusLabel: serviceStatusLabel(
+                                    request,
+                                    providerId,
+                                  ),
+                                  busy: _busyIds.contains(request.id),
+                                  onPropose: () => _onPropose(request),
+                                  onDecline: () => _onDecline(request),
+                                  onAdvance: (a) => _onAdvance(request, a),
+                                );
+                              },
                             ),
                     ),
             ),
@@ -185,7 +335,7 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
   }
 
   Widget _buildFilterChips() {
-    const filters = ['Todos', 'Pendentes', 'Aceitos'];
+    const filters = ['Todos', 'Convites', 'Meus serviços'];
     return Row(
       children: filters.map((f) {
         final isActive = f == _filter;
@@ -217,29 +367,32 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
     );
   }
 
-  double _homeBannerHeight(BuildContext context) {
-    final width = MediaQuery.of(context).size.width - 48;
-    return (width / 3.19).clamp(88.0, 118.0);
+  Widget _buildHomeBanner(BuildContext context) {
+    return BenefitsBanner(onTap: () => context.push('/benefits'));
   }
 
-  Widget _buildHomeBanner(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => context.push('/benefits'),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            height: _homeBannerHeight(context),
-            width: double.infinity,
-            child: Image.asset(
-              'assets/images/banner.png',
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.cloud_off_rounded,
+            size: 56,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _error!,
+            style: const TextStyle(
+              fontFamily: 'QuasimodoSemiBold',
+              fontSize: 15,
+              color: AppColors.textSecondary,
             ),
           ),
-        ),
+          const SizedBox(height: 12),
+          TextButton(onPressed: _load, child: const Text('Tentar novamente')),
+        ],
       ),
     );
   }
@@ -267,14 +420,45 @@ class _ServiceRequestsPageState extends State<ServiceRequestsPage> {
 
 class _RequestCard extends StatelessWidget {
   final ServiceRequestData request;
-  final VoidCallback onAccept;
-  final VoidCallback onReject;
+  final ProviderServiceAction action;
+  final String statusLabel;
+  final bool busy;
+  final VoidCallback onPropose;
+  final VoidCallback onDecline;
+  final ValueChanged<ProviderServiceAction> onAdvance;
 
   const _RequestCard({
     required this.request,
-    required this.onAccept,
-    required this.onReject,
+    required this.action,
+    required this.statusLabel,
+    required this.busy,
+    required this.onPropose,
+    required this.onDecline,
+    required this.onAdvance,
   });
+
+  String? get _advanceLabel => switch (action) {
+    ProviderServiceAction.confirm => 'Confirmar serviço',
+    ProviderServiceAction.start => 'Iniciar serviço',
+    ProviderServiceAction.finish => 'Concluir serviço',
+    _ => null,
+  };
+
+  Widget _primaryButton(String label, VoidCallback? onPressed) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.highlight,
+        foregroundColor: AppColors.onHighlight,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontFamily: 'OutfitBlack', fontSize: 13),
+      ),
+    );
+  }
 
   String get _formattedDate {
     final d = request.serviceDate;
@@ -416,7 +600,7 @@ class _RequestCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                'R\$ ${request.displayPrice.toStringAsFixed(2)}',
+                servicePriceLabel(request),
                 style: const TextStyle(
                   fontFamily: 'OutfitBlack',
                   fontSize: 15,
@@ -425,13 +609,29 @@ class _RequestCard extends StatelessWidget {
               ),
             ],
           ),
-          if (request.isOpen) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2ECC71).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              statusLabel,
+              style: const TextStyle(
+                fontFamily: 'OutfitBlack',
+                fontSize: 12,
+                color: Color(0xFF2ECC71),
+              ),
+            ),
+          ),
+          if (action == ProviderServiceAction.proposePrice) ...[
             const SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: onReject,
+                    onPressed: busy ? null : onDecline,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red.shade400,
                       side: BorderSide(color: Colors.red.shade300),
@@ -448,44 +648,102 @@ class _RequestCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: onAccept,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.highlight,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                    child: const Text(
-                      'Aceitar',
-                      style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 13),
-                    ),
+                  child: _primaryButton(
+                    'Propor preço',
+                    busy ? null : onPropose,
                   ),
                 ),
               ],
             ),
-          ] else ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2ECC71).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'Aceito',
-                style: TextStyle(
-                  fontFamily: 'OutfitBlack',
-                  fontSize: 12,
-                  color: Color(0xFF2ECC71),
-                ),
+          ] else if (_advanceLabel != null) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: _primaryButton(
+                _advanceLabel!,
+                busy ? null : () => onAdvance(action),
               ),
             ),
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Pede o preço da proposta em Kz e devolve o valor validado.
+class _PriceProposalDialog extends StatefulWidget {
+  final double? initial;
+
+  const _PriceProposalDialog({this.initial});
+
+  @override
+  State<_PriceProposalDialog> createState() => _PriceProposalDialogState();
+}
+
+class _PriceProposalDialogState extends State<_PriceProposalDialog> {
+  late final TextEditingController _controller;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    _controller = TextEditingController(
+      text: initial != null && initial > 0 ? initial.toStringAsFixed(0) : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = parseKzAmount(_controller.text);
+    if (value == null) {
+      setState(() => _error = 'Indique um valor válido em Kz.');
+      return;
+    }
+    Navigator.pop(context, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Propor preço'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Indique o valor do serviço. O administrador analisa a sua proposta.',
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'Valor',
+              suffixText: 'Kz',
+              errorText: _error,
+            ),
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(onPressed: _submit, child: const Text('Enviar proposta')),
+      ],
     );
   }
 }

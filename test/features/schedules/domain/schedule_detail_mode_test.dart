@@ -5,11 +5,11 @@ void main() {
   test('re-check usa texto de cliente confirmado', () {
     expect(
       scheduleDetailHeaderTitle(isDriverRecheck: true),
-      'Cliente confirmou sua viagem',
+      'Cliente confirmou a sua viagem',
     );
     expect(
       scheduleDetailHeaderSubtitle(isDriverRecheck: true),
-      'Confira os detalhes e confirme se ainda quer manter o agendamento',
+      'Verifique os detalhes e confirme se ainda pretende manter o agendamento',
     );
   });
 

@@ -4,9 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:kz_servicos_prestador/features/trip/data/models/route_result.dart';
+import 'package:kz_servicos_prestador/core/constants/app_geo.dart';
 
 class DirectionsService {
-  static const String _apiKey = 'AIzaSyCwDyzjfdpfbRU06n6GwzlqbIj_-xfgLHw';
+  static const String _apiKey = String.fromEnvironment(
+    'GOOGLE_MAPS_API_KEY',
+    defaultValue: '',
+  );
 
   final http.Client _client;
 
@@ -34,7 +38,8 @@ class DirectionsService {
       'origin': '${origin.latitude},${origin.longitude}',
       'destination': '${destination.latitude},${destination.longitude}',
       'key': _apiKey,
-      'language': 'pt-BR',
+      'language': AppGeo.language,
+      'region': AppGeo.regionCode,
       'mode': 'driving',
     };
     if (waypoints.isNotEmpty) {
@@ -49,13 +54,7 @@ class DirectionsService {
     );
 
     try {
-      final response = await _client.get(
-        uri,
-        headers: {
-          'X-Android-Package': 'com.kzservicos.kz_servicos_prestador',
-          'X-Android-Cert': 'c691533385a5bc73b9d778008a0162cec509dce4',
-        },
-      );
+      final response = await _client.get(uri);
       debugPrint(
         '[KZ-DIR] status=${response.statusCode} body=${response.body.substring(0, response.body.length.clamp(0, 400))}',
       );

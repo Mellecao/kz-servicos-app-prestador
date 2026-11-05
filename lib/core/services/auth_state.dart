@@ -55,5 +55,6 @@ class AuthState {
   }
 
   static bool get isDriver => _providerType == ProviderType.driver;
-  static bool get isServiceProvider => _providerType == ProviderType.serviceProvider;
+  static bool get isServiceProvider =>
+      _providerType == ProviderType.serviceProvider;
 }

@@ -44,8 +44,10 @@ class ScheduledDirectRequestCard extends StatelessWidget {
               backgroundColor: Color(0xFFFEF3C7),
             ),
             const SizedBox(height: 8),
-            Text('Cliente: $clientName',
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'Cliente: $clientName',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             Text('De: $pickupAddress'),
             Text('Para: $dropoffAddress'),

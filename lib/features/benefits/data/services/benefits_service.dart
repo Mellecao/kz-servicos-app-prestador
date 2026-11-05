@@ -50,12 +50,12 @@ class BenefitsService {
   static const mockPartners = [
     BenefitPartner(
       id: 'mock-auto-center',
-      merchantName: 'Auto Center KZ',
+      merchantName: 'Auto Center Luanda',
       merchantAddress: 'Av. Brasil, 1200 - Centro',
-      merchantPhone: '(11) 4002-0101',
+      merchantPhone: '+244 222 123 456',
       serviceOffered: 'Troca de óleo completa',
       serviceDescription:
-          'Troca de óleo com filtro, revisão visual de fluidos e calibragem dos pneus para parceiros KZ.',
+          'Troca de óleo com filtro, revisão visual de fluidos e calibragem dos pneus para parceiros Só Serviços.',
       discountPercent: 20,
       originalPrice: 180,
       isActive: true,
@@ -64,7 +64,7 @@ class BenefitsService {
       id: 'mock-lava-rapido',
       merchantName: 'Lava Rápido Prime',
       merchantAddress: 'Rua das Palmeiras, 88 - Vila Nova',
-      merchantPhone: '(11) 98888-1212',
+      merchantPhone: '+244 923 111 222',
       serviceOffered: 'Lavagem completa',
       serviceDescription:
           'Lavagem externa, aspiração interna, pretinho nos pneus e higienização simples do painel.',
@@ -76,7 +76,7 @@ class BenefitsService {
       id: 'mock-pneus',
       merchantName: 'Pneus & Alinhamento Norte',
       merchantAddress: 'Av. do Contorno, 455 - Jardim Norte',
-      merchantPhone: '(11) 3555-7890',
+      merchantPhone: '+244 222 765 432',
       serviceOffered: 'Alinhamento e balanceamento',
       serviceDescription:
           'Pacote com alinhamento dianteiro, balanceamento das quatro rodas e checagem de suspensão.',

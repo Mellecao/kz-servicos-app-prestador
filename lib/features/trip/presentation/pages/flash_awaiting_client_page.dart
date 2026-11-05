@@ -56,9 +56,7 @@ class _FlashAwaitingClientPageState extends State<FlashAwaitingClientPage> {
           router.go('/flash/recheck/${widget.tripId}');
         } else {
           messenger.showSnackBar(
-            const SnackBar(
-              content: Text('Cliente escolheu outro motorista'),
-            ),
+            const SnackBar(content: Text('Cliente escolheu outro motorista')),
           );
           router.go('/home');
         }
@@ -80,15 +78,15 @@ class _FlashAwaitingClientPageState extends State<FlashAwaitingClientPage> {
 
   @override
   Widget build(BuildContext context) => const Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Proposta enviada, aguardando cliente escolher...'),
-            ],
-          ),
-        ),
-      );
+    body: Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(height: 16),
+          Text('Proposta enviada, a aguardar que o cliente escolha...'),
+        ],
+      ),
+    ),
+  );
 }

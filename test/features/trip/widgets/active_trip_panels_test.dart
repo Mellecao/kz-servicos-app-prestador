@@ -64,7 +64,7 @@ void main() {
 
     expect(find.text('Cancelamento em análise'), findsNWidgets(2));
     expect(
-      find.text('A corrida continua ativa até a resposta da KZ.'),
+      find.text('A viagem continua ativa até à resposta da Só Serviços.'),
       findsOneWidget,
     );
 
@@ -72,7 +72,7 @@ void main() {
     expect(requestedAgain, isFalse);
   });
 
-  testWidgets('ActiveTripPanel abre o chat com a KZ', (tester) async {
+  testWidgets('ActiveTripPanel abre o chat com o suporte', (tester) async {
     var openedSupport = false;
 
     await tester.pumpWidget(
@@ -94,7 +94,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Chat com a KZ'));
+    await tester.tap(find.text('Chat com o suporte'));
     expect(openedSupport, isTrue);
   });
 

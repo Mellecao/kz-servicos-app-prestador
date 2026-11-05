@@ -8,6 +8,7 @@ TripData makePendingTrip(
   String status = 'searching_drivers',
   String? candidateStatus,
   String tripType = 'standard',
+  List<TripPassenger> passengers = const [],
 }) => TripData(
   tripId: id,
   candidateId: 'candidate-$id',
@@ -27,6 +28,7 @@ TripData makePendingTrip(
   tripType: tripType,
   offeredPrice: 75,
   paymentMethod: 'pix',
+  passengers: passengers,
 );
 
 Widget buildCarousel(
@@ -125,6 +127,37 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(changed?.tripId, '2');
+    });
+
+    testWidgets('separa crianças dos passageiros no card de solicitação', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildCarousel([
+          makePendingTrip(
+            '1',
+            passengers: const [
+              TripPassenger(
+                name: 'Lia',
+                age: 5,
+                needsCarSeat: true,
+                sortOrder: 1,
+              ),
+              TripPassenger(
+                name: 'Carlos',
+                age: 34,
+                needsCarSeat: false,
+                sortOrder: 2,
+              ),
+            ],
+          ),
+        ], selectedTripId: '1'),
+      );
+
+      expect(find.text('Passageiros'), findsOneWidget);
+      expect(find.text('Carlos — 34 anos'), findsOneWidget);
+      expect(find.text('Crianças'), findsOneWidget);
+      expect(find.text('Lia — 5 anos (levar cadeirinha)'), findsOneWidget);
     });
   });
 }

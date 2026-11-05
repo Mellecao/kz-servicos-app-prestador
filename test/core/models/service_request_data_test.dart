@@ -25,4 +25,40 @@ void main() {
       'https://example.com/2.jpg',
     ]);
   });
+
+  Map<String, dynamic> base() => {
+    'id': 'request-2',
+    'description': 'Instalar candeeiro',
+    'service_date': '2026-11-05T12:00:00.000Z',
+    'status': 'searching_provider',
+    'is_paid': false,
+    'created_at': '2026-11-05T10:00:00.000Z',
+    'service_categories': {'name': 'Eletricista'},
+    'client': {'full_name': 'Miguel Cliente'},
+  };
+
+  test(
+    'sem address_id usa a morada que o app Cliente grava em observations',
+    () {
+      final request = ServiceRequestData.fromMap({
+        ...base(),
+        'addresses': null,
+        'observations': 'Talatona, Luanda',
+      });
+      expect(request.address, 'Talatona, Luanda');
+    },
+  );
+
+  test('addresses.formatted_address tem prioridade sobre observations', () {
+    final request = ServiceRequestData.fromMap({
+      ...base(),
+      'addresses': {'formatted_address': 'Rua da Missão 12, Maianga'},
+      'observations': 'outra coisa',
+    });
+    expect(request.address, 'Rua da Missão 12, Maianga');
+  });
+
+  test('sem nenhuma morada mostra "-"', () {
+    expect(ServiceRequestData.fromMap(base()).address, '-');
+  });
 }

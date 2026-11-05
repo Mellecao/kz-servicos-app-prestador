@@ -22,7 +22,8 @@ void main() {
 
     expect(requestedUri?.host, 'maps.googleapis.com');
     expect(requestedUri?.path, '/maps/api/directions/json');
-    expect(requestedUri?.queryParameters['language'], 'pt-BR');
+    expect(requestedUri?.queryParameters['language'], 'pt-PT');
+    expect(requestedUri?.queryParameters['region'], 'ao');
     expect(result.polyline, hasLength(3));
     expect(result.steps, hasLength(1));
     expect(result.steps.single.instruction, 'Vire à direita na Rua A');

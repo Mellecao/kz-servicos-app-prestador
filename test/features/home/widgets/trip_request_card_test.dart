@@ -192,7 +192,7 @@ void main() {
 
     expect(
       find.text(
-        'O passageiro confirmou a corrida. Confira os detalhes e confirme se ainda quer manter o agendamento.',
+        'O passageiro confirmou a viagem. Verifique os detalhes e confirme se ainda pretende manter o agendamento.',
       ),
       findsOneWidget,
     );
@@ -222,7 +222,7 @@ void main() {
     expect(find.byKey(const Key('price_input')), findsOneWidget);
     expect(
       find.text(
-        'O passageiro confirmou a corrida. Confira os detalhes e confirme se ainda quer manter o agendamento.',
+        'O passageiro confirmou a viagem. Verifique os detalhes e confirme se ainda pretende manter o agendamento.',
       ),
       findsNothing,
     );
@@ -232,5 +232,56 @@ void main() {
     await tester.pump();
 
     expect(acceptedPrice, 90.5);
+  });
+
+  testWidgets('separa crianças dos passageiros e alerta sobre cadeirinha', (
+    tester,
+  ) async {
+    final request = _mockTrip.copyWith(
+      passengerCount: 2,
+      childrenCount: 1,
+      luggageCount: 2,
+      passengers: const [
+        TripPassenger(name: 'Lia', age: 5, needsCarSeat: true, sortOrder: 1),
+        TripPassenger(
+          name: 'Carlos',
+          age: 34,
+          needsCarSeat: false,
+          sortOrder: 2,
+        ),
+      ],
+      luggage: const [
+        TripLuggage(
+          type: 'suitcase',
+          size: 'large',
+          weightKg: 23.5,
+          quantity: 2,
+          sortOrder: 1,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: TripRequestCard(
+              request: request,
+              onAccept: (_) {},
+              onReject: () {},
+              onShowDetails: () {},
+              reduceEffects: true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Passageiros'), findsOneWidget);
+    expect(find.text('Carlos — 34 anos'), findsOneWidget);
+    expect(find.text('Crianças'), findsOneWidget);
+    expect(find.text('Lia — 5 anos (levar cadeirinha)'), findsOneWidget);
+    expect(find.text('Atenção'), findsNothing);
+    expect(find.text('2x Mala grande (23,5 kg cada)'), findsOneWidget);
   });
 }

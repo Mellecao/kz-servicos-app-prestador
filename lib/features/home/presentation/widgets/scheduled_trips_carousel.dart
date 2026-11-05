@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
+import 'package:kz_servicos_prestador/core/utils/kz_format.dart';
 
 class ScheduledTripsCarousel extends StatefulWidget {
   final List<TripData> trips;
@@ -237,7 +238,7 @@ class _TripCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                'R\$ ${trip.price.toStringAsFixed(2)}',
+                formatKz(trip.price),
                 style: const TextStyle(
                   fontFamily: 'OutfitBlack',
                   fontSize: 16,
@@ -362,7 +363,7 @@ class _TripCard extends StatelessWidget {
                 ),
                 icon: const Icon(Icons.navigation_rounded, size: 18),
                 label: const Text(
-                  'Iniciar corrida',
+                  'Iniciar viagem',
                   style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 13),
                 ),
               ),

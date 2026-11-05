@@ -5,12 +5,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
+import 'package:kz_servicos_prestador/core/constants/feature_flags.dart';
 import 'package:kz_servicos_prestador/core/constants/category_colors.dart';
 import 'package:kz_servicos_prestador/core/models/provider_profile_data.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/provider_service.dart';
 import 'package:kz_servicos_prestador/core/widgets/service_provider_bottom_nav.dart';
 import 'package:kz_servicos_prestador/routes/app_router.dart';
+import 'package:kz_servicos_prestador/core/constants/support_contact.dart';
 
 class ProviderProfilePage extends StatefulWidget {
   final ValueChanged<int> onNavTap;
@@ -53,7 +55,7 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
           children: [
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Câmera'),
+              title: const Text('Câmara'),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             ListTile(
@@ -110,7 +112,7 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Erro ao salvar foto. Tente novamente.'),
+            content: Text('Erro ao guardar foto. Tente novamente.'),
           ),
         );
       }
@@ -392,26 +394,25 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
               const SizedBox(height: 20),
               _HelpRow(
                 icon: Icons.phone_outlined,
-                label: 'Telefone',
-                value: '(11) 99999-0000',
-                onTap: () => launchUrl(Uri.parse('tel:+5511999990000')),
+                label: 'Telemóvel',
+                value: SupportContact.phoneDisplay,
+                onTap: () => launchUrl(SupportContact.telUri),
               ),
               const Divider(height: 24),
               _HelpRow(
                 icon: Icons.email_outlined,
                 label: 'E-mail',
-                value: 'contato@kzservicos.com.br',
-                onTap: () =>
-                    launchUrl(Uri.parse('mailto:contato@kzservicos.com.br')),
+                value: SupportContact.email,
+                onTap: () => launchUrl(SupportContact.mailtoUri),
               ),
               const Divider(height: 24),
               _HelpRow(
                 icon: Icons.chat_outlined,
                 label: 'WhatsApp',
-                value: 'Fale conosco',
+                value: 'Fale connosco',
                 iconColor: const Color(0xFF25D366),
                 onTap: () => launchUrl(
-                  Uri.parse('https://wa.me/5511999990000'),
+                  SupportContact.whatsappUri,
                   mode: LaunchMode.externalApplication,
                 ),
               ),
@@ -428,11 +429,11 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text(
-          'Sair da conta',
+          'Terminar sessão',
           style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 18),
         ),
         content: const Text(
-          'Tem certeza que deseja sair da sua conta?',
+          'Tem a certeza de que pretende terminar sessão?',
           style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
         ),
         actions: [
@@ -449,7 +450,7 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
               AppRouter.logout(context);
             },
             child: Text(
-              'Sair',
+              'Terminar sessão',
               style: TextStyle(
                 color: Colors.red.shade400,
                 fontWeight: FontWeight.w600,
@@ -479,11 +480,13 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
             label: 'Histórico de serviços',
             onTap: () {},
           ),
-          _MenuItem(
-            icon: Icons.card_giftcard_rounded,
-            label: 'Clube de benefícios',
-            onTap: () => context.go('/provider-benefits'),
-          ),
+          // Clube de benefícios desativado (ver FeatureFlags).
+          if (FeatureFlags.benefitsClubEnabled)
+            _MenuItem(
+              icon: Icons.card_giftcard_rounded,
+              label: 'Clube de benefícios',
+              onTap: () => context.go('/provider-benefits'),
+            ),
           _MenuItem(
             icon: Icons.security_outlined,
             label: 'Segurança',
@@ -496,7 +499,7 @@ class _ProviderProfilePageState extends State<ProviderProfilePage> {
           ),
           _MenuItem(
             icon: Icons.logout,
-            label: 'Sair',
+            label: 'Terminar sessão',
             color: Colors.red.shade400,
             onTap: () => _showLogoutDialog(context),
             showDivider: false,

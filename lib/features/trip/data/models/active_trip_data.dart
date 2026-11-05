@@ -1,4 +1,6 @@
-import 'package:kz_servicos_prestador/core/utils/brazil_time.dart';
+import 'package:kz_servicos_prestador/core/utils/angola_time.dart';
+import 'package:kz_servicos_prestador/core/utils/payment_labels.dart';
+import 'package:kz_servicos_prestador/core/constants/app_geo.dart';
 
 class ActiveTripData {
   final String id;
@@ -55,14 +57,7 @@ class ActiveTripData {
     this.stops = const [],
   });
 
-  String get paymentMethodLabel => switch (paymentMethod) {
-    'pix' => 'PIX',
-    'debit' => 'Débito',
-    'credit' => 'Crédito',
-    'cash' => 'Dinheiro',
-    'billing' => 'Faturamento',
-    _ => paymentMethod ?? '-',
-  };
+  String get paymentMethodLabel => labelForPaymentMethod(paymentMethod);
 
   factory ActiveTripData.fromSupabase(
     Map<String, dynamic> trip,
@@ -99,7 +94,7 @@ class ActiveTripData {
 
     DateTime? parseDate(Object? value) {
       if (value == null) return null;
-      return BrazilTime.maybeFromBackend(value.toString());
+      return AngolaTime.maybeFromBackend(value.toString());
     }
 
     double parseDouble(Object? value, double fallback) {
@@ -124,10 +119,13 @@ class ActiveTripData {
       clientAvatarUrl: clientUser?['avatar_url'] as String?,
       pickupAddress: shortAddress(pickup),
       destinationAddress: shortAddress(dropoff),
-      pickupLat: parseDouble(pickup['latitude'], -23.5505),
-      pickupLng: parseDouble(pickup['longitude'], -46.6333),
-      destinationLat: parseDouble(dropoff['latitude'], -23.5505),
-      destinationLng: parseDouble(dropoff['longitude'], -46.6333),
+      pickupLat: parseDouble(pickup['latitude'], AppGeo.luanda.latitude),
+      pickupLng: parseDouble(pickup['longitude'], AppGeo.luanda.longitude),
+      destinationLat: parseDouble(dropoff['latitude'], AppGeo.luanda.latitude),
+      destinationLng: parseDouble(
+        dropoff['longitude'],
+        AppGeo.luanda.longitude,
+      ),
       passengerCount: trip['passenger_count'] as int? ?? 1,
       offeredPrice: parseDouble(price, 0),
       paymentMethod: trip['payment_method'] as String?,
@@ -140,10 +138,11 @@ class ActiveTripData {
       isRoundTrip: trip['is_round_trip'] as bool? ?? false,
       executionStage: trip['execution_stage'] as String?,
       currentStopOrder: trip['current_stop_order'] as int?,
-      stops: ((trip['trip_stops'] as List?) ?? const [])
-          .map((row) => ActiveTripStop.fromMap(row as Map<String, dynamic>))
-          .toList()
-        ..sort((a, b) => a.order.compareTo(b.order)),
+      stops:
+          ((trip['trip_stops'] as List?) ?? const [])
+              .map((row) => ActiveTripStop.fromMap(row as Map<String, dynamic>))
+              .toList()
+            ..sort((a, b) => a.order.compareTo(b.order)),
     );
   }
 }
@@ -169,15 +168,20 @@ class ActiveTripStop {
 
   factory ActiveTripStop.fromMap(Map<String, dynamic> row) {
     final address = row['addresses'] as Map<String, dynamic>? ?? {};
-    double number(Object? value) => value is num ? value.toDouble() : double.tryParse('$value') ?? -23.5505;
+    double number(Object? value, double fallback) =>
+        value is num ? value.toDouble() : double.tryParse('$value') ?? fallback;
     return ActiveTripStop(
       id: row['id'] as String,
       order: row['stop_order'] as int? ?? 0,
       address: address['formatted_address'] as String? ?? 'Parada',
-      latitude: number(address['latitude']),
-      longitude: number(address['longitude']),
-      arrivedAt: BrazilTime.maybeFromBackend(row['arrived_at']?.toString() ?? ''),
-      resumedAt: BrazilTime.maybeFromBackend(row['resumed_at']?.toString() ?? ''),
+      latitude: number(address['latitude'], AppGeo.luanda.latitude),
+      longitude: number(address['longitude'], AppGeo.luanda.longitude),
+      arrivedAt: AngolaTime.maybeFromBackend(
+        row['arrived_at']?.toString() ?? '',
+      ),
+      resumedAt: AngolaTime.maybeFromBackend(
+        row['resumed_at']?.toString() ?? '',
+      ),
     );
   }
 }

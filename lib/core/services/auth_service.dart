@@ -38,7 +38,7 @@ class AuthService {
         await _client.auth.signOut();
         debugPrint('[AuthService] ERRO: user não encontrado como provider');
         return AuthResult.failure(
-          'Acesso negado. Apenas prestadores de serviço e motoristas podem acessar.',
+          'Acesso negado. Apenas prestadores de serviço e motoristas podem aceder.',
         );
       }
 
@@ -57,7 +57,7 @@ class AuthService {
       if (status != 'approved') {
         await _client.auth.signOut();
         return AuthResult.failure(
-          'Sua conta ainda está pendente de aprovação.',
+          'A sua conta ainda está pendente de aprovação.',
         );
       }
 
@@ -185,7 +185,7 @@ class AuthService {
   String _mapAuthError(AuthException exception) {
     switch (exception.message) {
       case 'Invalid login credentials':
-        return 'E-mail ou senha incorretos';
+        return 'E-mail ou palavra-passe incorretos';
       case 'Email not confirmed':
         return 'E-mail não confirmado';
       case 'Too many requests':

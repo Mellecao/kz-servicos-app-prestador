@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/features/schedules/data/models/mock_schedule.dart';
+import 'package:kz_servicos_prestador/core/utils/kz_format.dart';
 
 class ScheduleCard extends StatelessWidget {
   final MockSchedule schedule;
@@ -9,10 +10,10 @@ class ScheduleCard extends StatelessWidget {
   const ScheduleCard({super.key, required this.schedule});
 
   Color get _statusColor => switch (schedule.status) {
-        ScheduleStatus.awaitingClientApproval => Colors.orange,
-        ScheduleStatus.awaitingDriverConfirmation => AppColors.secondary,
-        ScheduleStatus.scheduled => const Color(0xFF2ECC71),
-      };
+    ScheduleStatus.awaitingClientApproval => Colors.orange,
+    ScheduleStatus.awaitingDriverConfirmation => AppColors.secondary,
+    ScheduleStatus.scheduled => const Color(0xFF2ECC71),
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -73,8 +74,11 @@ class ScheduleCard extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                Icon(Icons.calendar_today,
-                    size: 14, color: Colors.grey.shade400),
+                Icon(
+                  Icons.calendar_today,
+                  size: 14,
+                  color: Colors.grey.shade400,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   dateStr,
@@ -84,8 +88,7 @@ class ScheduleCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-                Icon(Icons.access_time,
-                    size: 14, color: Colors.grey.shade400),
+                Icon(Icons.access_time, size: 14, color: Colors.grey.shade400),
                 const SizedBox(width: 6),
                 Text(
                   timeStr,
@@ -96,7 +99,7 @@ class ScheduleCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  'R\$ ${schedule.price.toStringAsFixed(2)}',
+                  formatKz(schedule.price),
                   style: const TextStyle(
                     fontFamily: 'OutfitBlack',
                     fontSize: 14,
@@ -109,8 +112,11 @@ class ScheduleCard extends StatelessWidget {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Icon(Icons.chat_bubble_outline,
-                          size: 20, color: Colors.grey.shade400),
+                      Icon(
+                        Icons.chat_bubble_outline,
+                        size: 20,
+                        color: Colors.grey.shade400,
+                      ),
                       if (schedule.hasKzMessage)
                         Positioned(
                           top: -2,
@@ -153,26 +159,16 @@ class _RouteLine extends StatelessWidget {
               height: 10,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFF2ECC71),
-                  width: 2,
-                ),
+                border: Border.all(color: const Color(0xFF2ECC71), width: 2),
               ),
             ),
-            Container(
-              width: 2,
-              height: 16,
-              color: Colors.grey.shade300,
-            ),
+            Container(width: 2, height: 16, color: Colors.grey.shade300),
             Container(
               width: 10,
               height: 10,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.red.shade400,
-                  width: 2,
-                ),
+                border: Border.all(color: Colors.red.shade400, width: 2),
               ),
             ),
           ],

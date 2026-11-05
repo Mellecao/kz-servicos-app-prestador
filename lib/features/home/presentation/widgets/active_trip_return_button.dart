@@ -4,10 +4,7 @@ import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 class ActiveTripReturnButton extends StatelessWidget {
   final VoidCallback onTap;
 
-  const ActiveTripReturnButton({
-    super.key,
-    required this.onTap,
-  });
+  const ActiveTripReturnButton({super.key, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +29,7 @@ class ActiveTripReturnButton extends StatelessWidget {
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Corrida em andamento',
+                  'Viagem em curso',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
+import 'package:kz_servicos_prestador/core/utils/angola_phone.dart';
+import 'package:kz_servicos_prestador/core/utils/document_validator.dart';
 import 'package:kz_servicos_prestador/features/profile/data/models/mock_provider.dart';
 
 class RegistrationPage extends StatefulWidget {
@@ -16,6 +18,14 @@ class RegistrationPage extends StatefulWidget {
   @override
   State<RegistrationPage> createState() => _RegistrationPageState();
 }
+
+FormFieldValidator<String> _validated(
+  bool Function(String) isValid,
+  String message,
+) => (v) {
+  if (v == null || v.trim().isEmpty) return 'Campo obrigatório';
+  return isValid(v) ? null : message;
+};
 
 class _RegistrationPageState extends State<RegistrationPage> {
   final _formKey = GlobalKey<FormState>();
@@ -49,12 +59,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
   bool get _isDriver => widget.providerType == ProviderType.driver;
 
   List<String> get _stepTitles => _isDriver
-      ? const ['Dados pessoais', 'CNH', 'Veículo', 'Dados bancários']
-      : const [
+      ? const [
           'Dados pessoais',
-          'Categorias de serviço',
+          'Carta de condução',
+          'Veículo',
           'Dados bancários',
-        ];
+        ]
+      : const ['Dados pessoais', 'Categorias de serviço', 'Dados bancários'];
 
   int get _totalSteps => _stepTitles.length;
 
@@ -81,9 +92,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     if (_step == _providerCategoriesStepIndex && !_isDriver) {
       if (_selectedCategories.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Selecione ao menos uma categoria'),
-          ),
+          const SnackBar(content: Text('Selecione pelo menos uma categoria')),
         );
         return;
       }
@@ -121,12 +130,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon:
-              const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: _back,
         ),
         title: Text(
-          'Cadastro - ${_stepTitles[_step]}',
+          'Registo - ${_stepTitles[_step]}',
           style: const TextStyle(
             fontFamily: 'OutfitBlack',
             fontSize: 18,
@@ -140,10 +148,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                child: _buildCurrentStep(),
-              ),
+              child: Form(key: _formKey, child: _buildCurrentStep()),
             ),
           ),
           _buildBottomBar(),
@@ -199,17 +204,23 @@ class _RegistrationPageState extends State<RegistrationPage> {
         const SizedBox(height: 16),
         _field(
           _cpfController,
-          'CPF',
+          'BI / NIF',
           Icons.badge_outlined,
-          keyboard: TextInputType.number,
-          formatters: [FilteringTextInputFormatter.digitsOnly],
+          formatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9 -]')),
+            LengthLimitingTextInputFormatter(18),
+          ],
+          validator: _validated(isValidBiNif, 'BI ou NIF inválido'),
         ),
         const SizedBox(height: 16),
         _field(
           _phoneController,
-          'Telefone',
+          'Telemóvel',
           Icons.phone_outlined,
           keyboard: TextInputType.phone,
+          prefixText: '$kAngolaDialCode ',
+          formatters: [PhoneInputFormatter()],
+          validator: _validated(isValidAngolaPhone, 'Telemóvel inválido'),
         ),
       ],
     );
@@ -220,7 +231,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       children: [
         _field(
           _cnhNumberController,
-          'Número da CNH',
+          'Número da carta de condução',
           Icons.credit_card_outlined,
           keyboard: TextInputType.number,
         ),
@@ -244,8 +255,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   Widget _buildVehicleStep() {
     return Column(
       children: [
-        _field(
-            _vehiclePlateController, 'Placa', Icons.pin_outlined),
+        _field(_vehiclePlateController, 'Matrícula', Icons.pin_outlined),
         const SizedBox(height: 16),
         _field(
           _vehicleModelController,
@@ -260,30 +270,26 @@ class _RegistrationPageState extends State<RegistrationPage> {
           keyboard: TextInputType.number,
         ),
         const SizedBox(height: 16),
-        _field(
-          _vehicleColorController,
-          'Cor',
-          Icons.palette_outlined,
-        ),
+        _field(_vehicleColorController, 'Cor', Icons.palette_outlined),
       ],
     );
   }
 
   static const _serviceCategories = [
     'Eletricista',
-    'Encanador',
+    'Canalizador',
     'Pintor',
-    'Faxineira',
+    'Limpeza geral',
     'Montador de Móveis',
     'Técnico de Informática',
     'Jardineiro',
     'Pedreiro',
     'Chaveiro',
-    'Ar-condicionado',
-    'Marceneiro',
+    'Ar condicionado',
+    'Carpinteiro',
     'Vidraceiro',
     'Serralheiro',
-    'Dedetizador',
+    'Controlo de pragas',
   ];
 
   Widget _buildServiceCategoriesStep() {
@@ -291,7 +297,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Selecione suas especialidades',
+          'Selecione as suas especialidades',
           style: TextStyle(
             fontFamily: 'OutfitBlack',
             fontSize: 16,
@@ -324,11 +330,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10),
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.highlight
-                      : Colors.white,
+                  color: isSelected ? AppColors.highlight : Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isSelected
@@ -341,9 +347,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   style: TextStyle(
                     fontFamily: 'QuasimodoSemiBold',
                     fontSize: 13,
-                    color: isSelected
-                        ? Colors.white
-                        : AppColors.textPrimary,
+                    color: isSelected ? Colors.white : AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -357,11 +361,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   Widget _buildBankStep() {
     return Column(
       children: [
-        _field(
-          _bankNameController,
-          'Banco',
-          Icons.account_balance_outlined,
-        ),
+        _field(_bankNameController, 'Banco', Icons.account_balance_outlined),
         const SizedBox(height: 16),
         _field(
           _bankAgencyController,
@@ -379,8 +379,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
         const SizedBox(height: 16),
         _field(
           _pixKeyController,
-          'Chave PIX',
-          Icons.pix_outlined,
+          'IBAN',
+          Icons.account_balance_wallet_outlined,
         ),
       ],
     );
@@ -392,15 +392,19 @@ class _RegistrationPageState extends State<RegistrationPage> {
     IconData icon, {
     TextInputType? keyboard,
     List<TextInputFormatter>? formatters,
+    FormFieldValidator<String>? validator,
+    String? prefixText,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboard,
       inputFormatters: formatters,
-      validator: (v) =>
-          (v == null || v.isEmpty) ? 'Campo obrigatório' : null,
+      validator:
+          validator ??
+          (v) => (v == null || v.isEmpty) ? 'Campo obrigatório' : null,
       decoration: InputDecoration(
         labelText: label,
+        prefixText: prefixText,
         prefixIcon: Icon(icon, color: AppColors.textSecondary),
         filled: true,
         fillColor: Colors.white,
@@ -425,17 +429,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
         onPressed: _next,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.highlight,
-          foregroundColor: Colors.white,
+          foregroundColor: AppColors.onHighlight,
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(
-            fontFamily: 'OutfitBlack',
-            fontSize: 16,
-          ),
+          textStyle: const TextStyle(fontFamily: 'OutfitBlack', fontSize: 16),
         ),
-        child: Text(isLast ? 'Finalizar cadastro' : 'Próximo'),
+        child: Text(isLast ? 'Concluir registo' : 'Próximo'),
       ),
     );
   }

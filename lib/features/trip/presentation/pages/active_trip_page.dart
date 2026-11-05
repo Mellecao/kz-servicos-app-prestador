@@ -7,13 +7,17 @@ import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:kz_servicos_prestador/core/constants/app_brand.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
+import 'package:kz_servicos_prestador/core/constants/app_geo.dart';
 import 'package:kz_servicos_prestador/core/constants/map_styles.dart';
+import 'package:kz_servicos_prestador/core/constants/support_contact.dart';
 import 'package:kz_servicos_prestador/core/maps/kz_map.dart';
 import 'package:kz_servicos_prestador/core/services/trip_chat_service.dart';
 import 'package:kz_servicos_prestador/core/services/trip_cancellation_service.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
+import 'package:kz_servicos_prestador/core/utils/angola_phone.dart';
 import 'package:kz_servicos_prestador/core/utils/custom_map_markers.dart';
 import 'package:kz_servicos_prestador/core/utils/route_pulse_animator.dart';
 import 'package:kz_servicos_prestador/core/widgets/circle_button.dart';
@@ -68,7 +72,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   final _directionsService = DirectionsService();
   final _audioService = NavigationAudioService();
 
-  LatLng _currentLocation = const LatLng(-23.5505, -46.6333);
+  LatLng _currentLocation = AppGeo.luanda;
   double _currentHeading = 0;
   double _currentSpeed = 0;
   Position? _lastAcceptedPosition;
@@ -85,8 +89,8 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   RealtimeChannel? _cancellationRequestChannel;
   RealtimeChannel? _incomingRequestsChannel;
 
-  BitmapDescriptor? _yellowPinIcon;
-  BitmapDescriptor? _yellowCircleIcon;
+  BitmapDescriptor? _brandPinIcon;
+  BitmapDescriptor? _brandCircleIcon;
   BitmapDescriptor? _navCarIcon;
 
   bool _showArrivedPopup = false;
@@ -154,8 +158,8 @@ class _ActiveTripPageState extends State<ActiveTripPage>
   };
   String get _executionSubtitle => switch (_executionStage) {
     'to_stop' => _nextStop?.address ?? 'Próxima parada',
-    'waiting_at_stop' => 'Aguardando retorno do passageiro',
-    'waiting_for_return' => 'Aguardando retorno',
+    'waiting_at_stop' => 'A aguardar retorno do passageiro',
+    'waiting_for_return' => 'A aguardar retorno',
     'returning' => widget.trip.pickupAddress,
     _ => _phase.subtitle(widget.trip),
   };
@@ -292,7 +296,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
                 SnackBar(
                   content: Text(
                     reason.isEmpty
-                        ? 'A KZ recusou o cancelamento. A corrida continua ativa.'
+                        ? 'A ${AppBrand.name} recusou o cancelamento. A viagem continua ativa.'
                         : 'Cancelamento recusado: $reason',
                   ),
                 ),
@@ -339,19 +343,21 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     _gpsPublishTimer?.cancel();
     _pulseAnimator?.stop();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Esta corrida foi cancelada pela KZ.')),
+      const SnackBar(
+        content: Text('Esta viagem foi cancelada pela ${AppBrand.name}.'),
+      ),
     );
     context.go('/home');
   }
 
   Future<void> _initIcons() async {
     final results = await Future.wait([
-      CustomMapMarkers.createYellowPinIcon(),
-      CustomMapMarkers.createYellowCircleIcon(),
+      CustomMapMarkers.createBrandPinIcon(),
+      CustomMapMarkers.createBrandCircleIcon(),
       CustomMapMarkers.createNavCarIcon(),
     ]);
-    _yellowPinIcon = results[0];
-    _yellowCircleIcon = results[1];
+    _brandPinIcon = results[0];
+    _brandCircleIcon = results[1];
     _navCarIcon = results[2];
     if (!mounted) return;
     _rebuildMarkers();
@@ -631,21 +637,21 @@ class _ActiveTripPageState extends State<ActiveTripPage>
         ),
       );
     }
-    if (_yellowPinIcon != null) {
+    if (_brandPinIcon != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('pickup'),
           position: _pickup,
-          icon: _yellowPinIcon!,
+          icon: _brandPinIcon!,
         ),
       );
     }
-    if (_yellowCircleIcon != null) {
+    if (_brandCircleIcon != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('destination'),
           position: _destination,
-          icon: _yellowCircleIcon!,
+          icon: _brandCircleIcon!,
         ),
       );
     }
@@ -843,7 +849,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
         try {
           final stage = await _tripService.advanceTripExecution(widget.trip.id);
           if (stage == null) {
-            throw StateError('Não foi possível avançar a corrida');
+            throw StateError('Não foi possível avançar a viagem');
           }
           _executionStage = stage;
           if (stage == 'waiting_at_stop') {
@@ -905,11 +911,10 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     final timeStr = scheduledAt != null
         ? '${scheduledAt.hour.toString().padLeft(2, '0')}:${scheduledAt.minute.toString().padLeft(2, '0')}'
         : '';
-    final msg = Uri.encodeComponent(
-      'Olá, tive um problema com o passageiro ${trip.clientName} na corrida de $dateStr às $timeStr, de ${trip.pickupAddress} para ${trip.destinationAddress}.',
-    );
+    final msg =
+        'Olá, tive um problema com o passageiro ${trip.clientName} na viagem de $dateStr às $timeStr, de ${trip.pickupAddress} para ${trip.destinationAddress}.';
     final ok = await launchUrl(
-      Uri.parse('https://wa.me/5511985889577?text=$msg'),
+      SupportContact.whatsappUriWithText(msg),
       mode: LaunchMode.externalApplication,
     );
     if (!ok && mounted) {
@@ -923,7 +928,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
     final phone = widget.trip.clientPhone;
     if (phone == null || phone.isEmpty) return;
     final ok = await launchUrl(
-      Uri.parse('tel:$phone'),
+      Uri.parse('tel:${dialablePhone(phone)}'),
       mode: LaunchMode.externalApplication,
     );
     if (!ok && mounted) {
@@ -949,7 +954,7 @@ class _ActiveTripPageState extends State<ActiveTripPage>
         '/chat/$roomId',
         extra: ChatPageArgs(
           roomId: roomId,
-          title: 'Corrida em andamento',
+          title: 'Viagem em curso',
           subtitle:
               '${widget.trip.pickupAddress} → ${widget.trip.destinationAddress}',
           clientName: widget.trip.clientName,
@@ -1066,13 +1071,13 @@ class _ActiveTripPageState extends State<ActiveTripPage>
       if (!mounted) return;
       setState(() => _cancellationPending = true);
       final draft = Uri.encodeComponent(
-        'Olá, preciso cancelar a corrida de ${widget.trip.pickupAddress} para ${widget.trip.destinationAddress}. Motivo informado: $reason',
+        'Olá, preciso cancelar a viagem de ${widget.trip.pickupAddress} para ${widget.trip.destinationAddress}. Motivo informado: $reason',
       );
       if (mounted) context.push('/support-chat?draft=$draft');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Pedido enviado. A corrida continua ativa durante a analise.',
+            'Pedido enviado. A viagem continua ativa durante a análise.',
           ),
         ),
       );

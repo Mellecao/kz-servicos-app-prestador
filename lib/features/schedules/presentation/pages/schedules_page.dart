@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kz_servicos_prestador/core/constants/app_brand.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
@@ -9,6 +10,7 @@ import 'package:kz_servicos_prestador/features/schedules/data/repositories/sched
 import 'package:kz_servicos_prestador/features/schedules/presentation/widgets/scheduled_direct_request_card.dart';
 import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import 'package:kz_servicos_prestador/core/utils/kz_format.dart';
 
 class SchedulesPage extends StatefulWidget {
   final ValueChanged<int> onNavTap;
@@ -32,8 +34,8 @@ class _SchedulesPageState extends State<SchedulesPage> {
   static const _filters = [
     'Todos',
     'Agendado',
-    'Aguardando re-check',
-    'Aguardando aprovação',
+    'A aguardar re-check',
+    'A aguardar aprovação',
   ];
 
   @override
@@ -97,7 +99,9 @@ class _SchedulesPageState extends State<SchedulesPage> {
   void _handleRemoteCancellation() {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Uma corrida foi cancelada pela KZ.')),
+      const SnackBar(
+        content: Text('Uma viagem foi cancelada pela ${AppBrand.name}.'),
+      ),
     );
     context.go('/home');
   }
@@ -119,11 +123,14 @@ class _SchedulesPageState extends State<SchedulesPage> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _fetchDirectRequests(String driverId) async {
+  Future<List<Map<String, dynamic>>> _fetchDirectRequests(
+    String driverId,
+  ) async {
     if (driverId.isEmpty) return const [];
-    final response = await Supabase.instance.client
-        .from('trip_driver_candidates')
-        .select('''
+    final response =
+        await Supabase.instance.client
+                .from('trip_driver_candidates')
+                .select('''
           trip_id, status,
           trips!inner (
             id, client_id, trip_type, status,
@@ -132,10 +139,11 @@ class _SchedulesPageState extends State<SchedulesPage> {
             users:client_id ( full_name )
           )
         ''')
-        .eq('driver_profile_id', driverId)
-        .eq('status', 'pending')
-        .eq('trips.trip_type', 'scheduled_choose_driver')
-        .eq('trips.status', 'awaiting_driver_confirmation') as List<dynamic>;
+                .eq('driver_profile_id', driverId)
+                .eq('status', 'pending')
+                .eq('trips.trip_type', 'scheduled_choose_driver')
+                .eq('trips.status', 'awaiting_driver_confirmation')
+            as List<dynamic>;
     return response.whereType<Map<String, dynamic>>().toList();
   }
 
@@ -193,11 +201,11 @@ class _SchedulesPageState extends State<SchedulesPage> {
     return switch (_activeFilter) {
       'Agendado' =>
         scheduled.where((trip) => trip.status == 'scheduled').toList(),
-      'Aguardando re-check' =>
+      'A aguardar re-check' =>
         scheduled
             .where((trip) => trip.status == 'awaiting_driver_confirmation')
             .toList(),
-      'Aguardando aprovação' => invitations,
+      'A aguardar aprovação' => invitations,
       _ => [...scheduled, ...invitations],
     };
   }
@@ -253,41 +261,56 @@ class _SchedulesPageState extends State<SchedulesPage> {
                             ),
                             children: [
                               ..._directRequests.map((row) {
-                                final trip = row['trips'] as Map<String, dynamic>;
-                                final client = trip['users'] as Map<String, dynamic>?;
+                                final trip =
+                                    row['trips'] as Map<String, dynamic>;
+                                final client =
+                                    trip['users'] as Map<String, dynamic>?;
                                 return ScheduledDirectRequestCard(
                                   tripId: trip['id'] as String,
-                                  clientName: (client?['full_name'] as String?) ?? 'Cliente',
-                                  pickupAddress: _formatAddr(trip['pickup_address']),
-                                  dropoffAddress: _formatAddr(trip['dropoff_address']),
+                                  clientName:
+                                      (client?['full_name'] as String?) ??
+                                      'Cliente',
+                                  pickupAddress: _formatAddr(
+                                    trip['pickup_address'],
+                                  ),
+                                  dropoffAddress: _formatAddr(
+                                    trip['dropoff_address'],
+                                  ),
                                   onAcceptWithPrice: (price) async {
-                                    await _directRepo.acceptWithPrice(trip['id'] as String, price);
+                                    await _directRepo.acceptWithPrice(
+                                      trip['id'] as String,
+                                      price,
+                                    );
                                     await _load();
                                   },
                                   onReject: () async {
-                                    await _directRepo.reject(trip['id'] as String);
+                                    await _directRepo.reject(
+                                      trip['id'] as String,
+                                    );
                                     await _load();
                                   },
                                 );
                               }),
-                              ...items.map((item) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 10),
-                                    child: GestureDetector(
-                                      onTap: () => context.push(
-                                        '/schedule-detail',
-                                        extra: item,
-                                      ),
-                                      child: _ScheduleCard(
-                                        trip: item,
-                                        isHighlighted:
-                                            item.status == 'scheduled' &&
-                                            _activeFilter == 'Todos',
-                                        onStartTrip: item.status == 'scheduled'
-                                            ? () => _startTrip(item)
-                                            : null,
-                                      ),
+                              ...items.map(
+                                (item) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: GestureDetector(
+                                    onTap: () => context.push(
+                                      '/schedule-detail',
+                                      extra: item,
                                     ),
-                                  )),
+                                    child: _ScheduleCard(
+                                      trip: item,
+                                      isHighlighted:
+                                          item.status == 'scheduled' &&
+                                          _activeFilter == 'Todos',
+                                      onStartTrip: item.status == 'scheduled'
+                                          ? () => _startTrip(item)
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -458,7 +481,7 @@ class _ScheduleCard extends StatelessWidget {
                     ),
                     const Spacer(),
                     Text(
-                      'R\$ ${trip.price.toStringAsFixed(2)}',
+                      formatKz(trip.price),
                       style: const TextStyle(
                         fontFamily: 'OutfitBlack',
                         fontSize: 14,

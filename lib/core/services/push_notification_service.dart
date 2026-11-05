@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/widgets.dart';
+import 'package:kz_servicos_prestador/core/constants/app_brand.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
@@ -27,8 +28,8 @@ class PushNotificationService {
   static const AndroidNotificationChannel _tripChannel =
       AndroidNotificationChannel(
         tripChannelId,
-        'Solicitações de corrida',
-        description: 'Alertas sonoros de novas solicitações de corrida.',
+        'Solicitações de viagem',
+        description: 'Alertas sonoros de novas solicitações de viagem.',
         importance: Importance.max,
         playSound: true,
         sound: RawResourceAndroidNotificationSound('trip_notification'),
@@ -39,7 +40,7 @@ class PushNotificationService {
       AndroidNotificationChannel(
         messageChannelId,
         'Mensagens',
-        description: 'Mensagens de clientes e da KZ.',
+        description: 'Mensagens de clientes e do suporte.',
         importance: Importance.high,
         playSound: true,
         enableVibration: true,
@@ -174,15 +175,15 @@ class PushNotificationService {
       'trip_request' ||
       'new_trip' ||
       'new_trip_request' => TripNotificationContent(
-        title: 'Nova corrida disponível!',
+        title: 'Nova viagem disponível!',
         body: pickup.isNotEmpty && destination.isNotEmpty
-            ? '${clientName.isNotEmpty ? clientName : 'Um passageiro'} solicitou uma corrida de $pickup para $destination.'
-            : '${clientName.isNotEmpty ? clientName : 'Um passageiro'} solicitou uma nova corrida.',
+            ? '${clientName.isNotEmpty ? clientName : 'Um passageiro'} solicitou uma viagem de $pickup para $destination.'
+            : '${clientName.isNotEmpty ? clientName : 'Um passageiro'} solicitou uma nova viagem.',
       ),
       'scheduled_direct_request' => TripNotificationContent(
-        title: 'Nova solicitação de corrida!',
+        title: 'Nova solicitação de viagem!',
         body:
-            '${clientName.isNotEmpty ? clientName : 'Um cliente'} escolheu você para uma viagem. Informe o seu valor.',
+            '${clientName.isNotEmpty ? clientName : 'Um cliente'} escolheu o seu perfil para uma viagem. Indique o seu valor.',
       ),
       'recheck' ||
       'awaiting_driver_confirmation' ||
@@ -191,7 +192,7 @@ class PushNotificationService {
       'trip_accepted_by_client' => TripNotificationContent(
         title: 'Passageiro confirmou!',
         body:
-            '${clientName.isNotEmpty ? clientName : 'O passageiro'} confirmou a corrida. Toque para confirmar sua participação.',
+            '${clientName.isNotEmpty ? clientName : 'O passageiro'} confirmou a viagem. Toque para confirmar a sua participação.',
       ),
       'trip_scheduled_driver' => const TripNotificationContent(
         title: 'Viagem agendada!',
@@ -202,22 +203,22 @@ class PushNotificationService {
         body: 'A viagem está em andamento.',
       ),
       'trip_finished_driver' => const TripNotificationContent(
-        title: 'Corrida concluída!',
-        body: 'A corrida foi finalizada com sucesso.',
+        title: 'Viagem concluída!',
+        body: 'A viagem foi terminada com sucesso.',
       ),
       'trip_cancelled_driver' => const TripNotificationContent(
-        title: 'Corrida cancelada',
-        body: 'A corrida foi cancelada.',
+        title: 'Viagem cancelada',
+        body: 'A viagem foi cancelada.',
       ),
       'trip_cancellation_rejected' => TripNotificationContent(
         title: 'Cancelamento recusado',
         body: cancellationReviewReason.isNotEmpty
             ? 'Motivo: $cancellationReviewReason'
-            : 'A corrida continua ativa.',
+            : 'A viagem continua ativa.',
       ),
       'service_assigned' => const TripNotificationContent(
         title: 'Novo serviço!',
-        body: 'Um serviço foi atribuído a você.',
+        body: 'Foi-lhe atribuído um serviço.',
       ),
       'service_cancelled' => const TripNotificationContent(
         title: 'Serviço cancelado',
@@ -225,16 +226,16 @@ class PushNotificationService {
       ),
       'chat_message' => TripNotificationContent(
         title:
-            'Nova mensagem de ${_value(data, ['sender_name', 'senderName', 'client_name', 'clientName']).isNotEmpty ? _value(data, ['sender_name', 'senderName', 'client_name', 'clientName']) : 'KZ'}',
+            'Nova mensagem de ${_value(data, ['sender_name', 'senderName', 'client_name', 'clientName']).isNotEmpty ? _value(data, ['sender_name', 'senderName', 'client_name', 'clientName']) : 'Suporte'}',
         body: _value(data, ['message', 'body', 'preview']).isNotEmpty
             ? _value(data, ['message', 'body', 'preview'])
-            : 'Você recebeu uma nova mensagem.',
+            : 'Recebeu uma nova mensagem.',
       ),
       'support_message' => TripNotificationContent(
-        title: 'Nova mensagem da KZ',
+        title: 'Nova mensagem do suporte',
         body: _value(data, ['message', 'body', 'preview']).isNotEmpty
             ? _value(data, ['message', 'body', 'preview'])
-            : 'Você recebeu uma nova mensagem.',
+            : 'Recebeu uma nova mensagem.',
       ),
       _ => null,
     };
@@ -347,8 +348,8 @@ class PushNotificationService {
 
     final fallback = buildTripNotificationContent(message.data);
     return TripNotificationContent(
-      title: notification.title ?? fallback?.title ?? 'KZ Serviços',
-      body: notification.body ?? fallback?.body ?? 'Você tem uma atualização.',
+      title: notification.title ?? fallback?.title ?? AppBrand.name,
+      body: notification.body ?? fallback?.body ?? 'Tem uma atualização.',
     );
   }
 

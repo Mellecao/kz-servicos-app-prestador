@@ -43,9 +43,43 @@ class NavigationAudioService {
 
   // Valores de distância disponíveis em metros (arquivos OsmAnd)
   static const List<int> _meterValues = [
-    25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95,
-    100, 110, 120, 130, 140, 150, 200, 250, 300, 350, 400, 450,
-    500, 550, 600, 650, 700, 750, 800, 850, 900, 950,
+    25,
+    30,
+    35,
+    40,
+    45,
+    50,
+    55,
+    60,
+    65,
+    70,
+    75,
+    80,
+    85,
+    90,
+    95,
+    100,
+    110,
+    120,
+    130,
+    140,
+    150,
+    200,
+    250,
+    300,
+    350,
+    400,
+    450,
+    500,
+    550,
+    600,
+    650,
+    700,
+    750,
+    800,
+    850,
+    900,
+    950,
   ];
 
   void toggleMute() {
@@ -55,7 +89,9 @@ class NavigationAudioService {
 
   Future<void> stop() async {
     _playToken++;
-    try { await _player.stop(); } catch (_) {}
+    try {
+      await _player.stop();
+    } catch (_) {}
   }
 
   /// Anuncia uma manobra com prefixo de distância.
@@ -66,10 +102,7 @@ class NavigationAudioService {
   }) async {
     if (_muted) return;
     final osmKey = _googleToOsmand[maneuver ?? ''] ?? 'go_ahead';
-    final files = [
-      ..._distanceFiles(distanceMeters),
-      '$osmKey.ogg',
-    ];
+    final files = [..._distanceFiles(distanceMeters), '$osmKey.ogg'];
     await _playSequence(files);
   }
 
@@ -101,8 +134,9 @@ class NavigationAudioService {
     if (meters < 20) return [];
 
     if (meters < 1000) {
-      final nearest = _meterValues.reduce((a, b) =>
-          (a - meters).abs() < (b - meters).abs() ? a : b);
+      final nearest = _meterValues.reduce(
+        (a, b) => (a - meters).abs() < (b - meters).abs() ? a : b,
+      );
       return ['in.ogg', '$nearest.ogg', 'meters.ogg'];
     }
 
@@ -126,13 +160,14 @@ double computeCompassHeading(List<double> accel, List<double> mag) {
 
   // Ângulos de inclinação do dispositivo
   final pitch = math.atan2(ay, math.sqrt(ax * ax + az * az));
-  final roll  = math.atan2(-ax, az);
+  final roll = math.atan2(-ax, az);
 
   // Heading compensado para inclinação do dispositivo
   final xh = mx * math.cos(pitch) + mz * math.sin(pitch);
-  final yh = mx * math.sin(roll) * math.sin(pitch) +
-             my * math.cos(roll) -
-             mz * math.sin(roll) * math.cos(pitch);
+  final yh =
+      mx * math.sin(roll) * math.sin(pitch) +
+      my * math.cos(roll) -
+      mz * math.sin(roll) * math.cos(pitch);
 
   double heading = math.atan2(-yh, xh) * 180 / math.pi;
   return (heading + 360) % 360;

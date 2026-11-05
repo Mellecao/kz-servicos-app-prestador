@@ -9,14 +9,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: ActiveTripReturnButton(
-            onTap: () => tapped = true,
-          ),
+          body: ActiveTripReturnButton(onTap: () => tapped = true),
         ),
       ),
     );
 
-    expect(find.text('Corrida em andamento'), findsOneWidget);
+    expect(find.text('Viagem em curso'), findsOneWidget);
     expect(find.text('Voltar'), findsOneWidget);
 
     await tester.tap(find.byType(ActiveTripReturnButton));

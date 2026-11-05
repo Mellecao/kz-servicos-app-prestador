@@ -7,6 +7,7 @@ import 'package:kz_servicos_prestador/core/services/trip_service.dart';
 import 'package:kz_servicos_prestador/core/widgets/circle_button.dart';
 import 'package:kz_servicos_prestador/core/widgets/service_provider_bottom_nav.dart';
 import 'package:kz_servicos_prestador/features/auth/presentation/pages/login_page.dart';
+import 'package:kz_servicos_prestador/core/constants/feature_flags.dart';
 import 'package:kz_servicos_prestador/features/benefits/presentation/pages/benefits_page.dart';
 import 'package:kz_servicos_prestador/core/services/trip_chat_service.dart';
 import 'package:kz_servicos_prestador/features/chat/presentation/pages/chat_page.dart';
@@ -94,6 +95,10 @@ class AppRouter {
       ),
       GoRoute(
         path: '/benefits',
+        // Clube de benefícios desativado (ver FeatureFlags): sem a tabela
+        // benefit_partners o ecrã ficaria vazio.
+        redirect: (context, state) =>
+            FeatureFlags.benefitsClubEnabled ? null : '/home',
         builder: (context, state) =>
             _withActiveTripBack(context, state, const BenefitsPage()),
       ),
@@ -130,9 +135,8 @@ class AppRouter {
       ),
       GoRoute(
         path: '/support-chat',
-        builder: (context, state) => SupportChatPage(
-          initialDraft: state.uri.queryParameters['draft'],
-        ),
+        builder: (context, state) =>
+            SupportChatPage(initialDraft: state.uri.queryParameters['draft']),
       ),
       GoRoute(
         path: '/security-settings',
@@ -193,6 +197,8 @@ class AppRouter {
       ),
       GoRoute(
         path: '/provider-benefits',
+        redirect: (context, state) =>
+            FeatureFlags.benefitsClubEnabled ? null : '/provider-home',
         builder: (context, state) => BenefitsPage(
           bottomNavigationBar: ServiceProviderBottomNav(
             selectedIndex: 2,

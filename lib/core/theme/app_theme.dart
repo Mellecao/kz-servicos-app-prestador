@@ -9,24 +9,30 @@ abstract final class AppTheme {
   static String get fontFamilyBody => _fontFamilyBody;
 
   static ThemeData get light => ThemeData(
-        scaffoldBackgroundColor: AppColors.background,
-        fontFamily: _fontFamilyBody,
-        colorScheme: ColorScheme.fromSeed(
+    scaffoldBackgroundColor: AppColors.background,
+    fontFamily: _fontFamilyBody,
+    colorScheme:
+        ColorScheme.fromSeed(
           seedColor: AppColors.highlight,
           surface: AppColors.background,
+        ).copyWith(
+          primary: AppColors.highlight,
+          onPrimary: AppColors.onHighlight,
+          primaryContainer: AppColors.highlightLight,
+          onPrimaryContainer: AppColors.onHighlight,
         ),
-        textTheme: const TextTheme(
-          headlineLarge: TextStyle(
-            fontFamily: _fontFamilyTitle,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            height: 1.2,
-          ),
-          bodyLarge: TextStyle(
-            fontFamily: _fontFamilyBody,
-            fontSize: 16,
-            height: 1.5,
-          ),
-        ),
-      );
+    textTheme: const TextTheme(
+      headlineLarge: TextStyle(
+        fontFamily: _fontFamilyTitle,
+        fontSize: 28,
+        fontWeight: FontWeight.w900,
+        height: 1.2,
+      ),
+      bodyLarge: TextStyle(
+        fontFamily: _fontFamilyBody,
+        fontSize: 16,
+        height: 1.5,
+      ),
+    ),
+  );
 }

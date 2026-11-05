@@ -36,9 +36,7 @@ class TripAudioService {
   Future<void> playPayment() async {
     try {
       await _oneShotPlayer.setReleaseMode(ReleaseMode.release);
-      await _oneShotPlayer.play(
-        AssetSource('audio/Payment_buttom_active.wav'),
-      );
+      await _oneShotPlayer.play(AssetSource('audio/Payment_buttom_active.wav'));
     } catch (e) {
       debugPrint('[TripAudio] playPayment erro: $e');
     }

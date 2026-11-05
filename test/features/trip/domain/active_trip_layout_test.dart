@@ -6,7 +6,10 @@ void main() {
     expect(activeTripMenuTopOffset(showNavigationBanner: false), 8);
   });
 
-  test('menu fica abaixo do banner de navegacao quando instrucoes aparecem', () {
-    expect(activeTripMenuTopOffset(showNavigationBanner: true), 168);
-  });
+  test(
+    'menu fica abaixo do banner de navegacao quando instrucoes aparecem',
+    () {
+      expect(activeTripMenuTopOffset(showNavigationBanner: true), 168);
+    },
+  );
 }

@@ -6,6 +6,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
+import 'package:kz_servicos_prestador/core/constants/feature_flags.dart';
+import 'package:kz_servicos_prestador/features/benefits/presentation/widgets/benefits_banner.dart';
 import 'package:kz_servicos_prestador/core/constants/map_styles.dart';
 import 'package:kz_servicos_prestador/core/maps/kz_map.dart';
 import 'package:kz_servicos_prestador/core/maps/route_polyline_builder.dart';
@@ -22,6 +24,7 @@ import 'package:kz_servicos_prestador/features/home/domain/home_realtime_reload_
 import 'package:kz_servicos_prestador/features/trip/data/services/directions_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:kz_servicos_prestador/core/services/trip_audio_service.dart';
+import 'package:kz_servicos_prestador/core/constants/app_geo.dart';
 
 const double _driverDefaultZoom = 17.5;
 const double _requestDriverRouteMaxDistanceMeters = 150000;
@@ -69,12 +72,12 @@ class _HomePageState extends State<HomePage> {
   bool _requestSurfaceOpen = false;
   String? _openedRequestTripId;
 
-  LatLng _currentLocation = const LatLng(-23.5505, -46.6333);
+  LatLng _currentLocation = AppGeo.luanda;
   bool _locationLoaded = false;
 
   // Cached custom icons
-  BitmapDescriptor? _yellowPinIcon;
-  BitmapDescriptor? _yellowCircleIcon;
+  BitmapDescriptor? _brandPinIcon;
+  BitmapDescriptor? _brandCircleIcon;
   BitmapDescriptor? _driverLocationIcon;
 
   // Floating messages icon drag state
@@ -119,7 +122,7 @@ class _HomePageState extends State<HomePage> {
     debugPrint('[HomePage] _load — driverProfileId: $driverProfileId');
     if (driverProfileId == null) {
       debugPrint(
-        '[HomePage] driverProfileId é null — usuário não é motorista ou sessão não restaurou esse campo',
+        '[HomePage] driverProfileId é null — utilizador não é motorista ou sessão não restaurou esse campo',
       );
       _loadInFlight = false;
       return;
@@ -429,8 +432,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _initIcons() async {
-    _yellowPinIcon = await _createYellowPinIcon();
-    _yellowCircleIcon = await _createYellowCircleIcon();
+    _brandPinIcon = await _createBrandPinIcon();
+    _brandCircleIcon = await _createBrandCircleIcon();
     _driverLocationIcon = await _createDriverLocationIcon();
     _updateDriverMarker();
   }
@@ -454,7 +457,7 @@ class _HomePageState extends State<HomePage> {
       _updateDriverMarker();
       _resetDriverMapView();
     } catch (_) {
-      // Use default São Paulo position
+      // Mantém a posição padrão (Luanda)
     }
   }
 
@@ -548,9 +551,7 @@ class _HomePageState extends State<HomePage> {
           )
         : null;
 
-    if (!mounted ||
-        _requests.isEmpty ||
-        serial != _routeRequestSerial) {
+    if (!mounted || _requests.isEmpty || serial != _routeRequestSerial) {
       return;
     }
 
@@ -584,21 +585,21 @@ class _HomePageState extends State<HomePage> {
         ),
       );
     }
-    if (_yellowPinIcon != null) {
+    if (_brandPinIcon != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('pickup'),
           position: pickup,
-          icon: _yellowPinIcon!,
+          icon: _brandPinIcon!,
         ),
       );
     }
-    if (_yellowCircleIcon != null) {
+    if (_brandCircleIcon != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('destination'),
           position: destination,
-          icon: _yellowCircleIcon!,
+          icon: _brandCircleIcon!,
         ),
       );
     }
@@ -615,7 +616,7 @@ class _HomePageState extends State<HomePage> {
       );
     }
     if (tripPoints.isNotEmpty) {
-      polylines.addAll(RoutePolylineBuilder.yellowRoute(tripPoints));
+      polylines.addAll(RoutePolylineBuilder.brandRoute(tripPoints));
     }
 
     return _RoutePreview(markers: markers, polylines: polylines);
@@ -714,7 +715,7 @@ class _HomePageState extends State<HomePage> {
 
   // ── Custom marker icons (same as client app) ──
 
-  Future<BitmapDescriptor> _createYellowPinIcon() async {
+  Future<BitmapDescriptor> _createBrandPinIcon() async {
     const width = 32.0;
     const height = 44.0;
     final recorder = ui.PictureRecorder();
@@ -738,7 +739,7 @@ class _HomePageState extends State<HomePage> {
     return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
   }
 
-  Future<BitmapDescriptor> _createYellowCircleIcon() async {
+  Future<BitmapDescriptor> _createBrandCircleIcon() async {
     const size = 28.0;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -779,7 +780,7 @@ class _HomePageState extends State<HomePage> {
       10,
       Paint()..color = Colors.white,
     );
-    // Yellow fill
+    // Brand fill
     canvas.drawCircle(
       const Offset(size / 2, size / 2),
       8,
@@ -857,19 +858,22 @@ class _HomePageState extends State<HomePage> {
             zoomControlsEnabled: false,
           ),
 
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            left: 16,
-            right: 16,
-            child: _buildHomeBanner(context),
-          ),
+          // Clube de benefícios desativado (ver FeatureFlags).
+          if (FeatureFlags.benefitsClubEnabled)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 16,
+              right: 16,
+              child: _buildHomeBanner(context),
+            ),
 
           if (hasActiveTripShortcut)
             Positioned(
               top:
                   MediaQuery.of(context).padding.top +
-                  _homeBannerHeight(context) +
-                  18,
+                  (FeatureFlags.benefitsClubEnabled
+                      ? _homeBannerHeight(context) + 18
+                      : 8),
               left: 16,
               right: 16,
               child: ActiveTripReturnButton(
@@ -1055,24 +1059,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHomeBanner(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => context.push('/benefits'),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            height: _homeBannerHeight(context),
-            width: double.infinity,
-            child: Image.asset(
-              'assets/images/banner.png',
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
-            ),
-          ),
-        ),
-      ),
-    );
+    return BenefitsBanner(onTap: () => context.push('/benefits'));
   }
 }

@@ -135,7 +135,7 @@ void main() {
       final row = {
         'id': 'sr-1',
         'service_date': '2026-04-20T09:00:00.000Z',
-        'service_categories': {'name': 'Diarista'},
+        'service_categories': {'name': 'Empregada doméstica'},
         'address': {'formatted_address': 'Rua das Flores, 100'},
         'client': {'id': 'client-1', 'full_name': 'Maria Silva'},
         'chat_rooms': [],
@@ -147,7 +147,7 @@ void main() {
       expect(entry.roomId, isNull);
       expect(entry.clientName, 'Maria Silva');
       expect(entry.subtitle, 'Rua das Flores, 100');
-      expect(entry.title, contains('Diarista'));
+      expect(entry.title, contains('Empregada doméstica'));
       expect(entry.title, contains('20/04'));
     });
 

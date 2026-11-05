@@ -19,6 +19,9 @@ import 'package:kz_servicos_prestador/features/trip/data/services/directions_ser
 import 'package:kz_servicos_prestador/features/trip/data/models/active_trip_data.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:kz_servicos_prestador/features/trip/presentation/widgets/cancel_trip_sheet.dart';
+import 'package:kz_servicos_prestador/core/utils/angola_phone.dart';
+import 'package:kz_servicos_prestador/core/utils/kz_format.dart';
+import 'package:kz_servicos_prestador/core/constants/app_brand.dart';
 
 class ScheduleDetailPage extends StatefulWidget {
   final TripData trip;
@@ -69,7 +72,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
   bool get _isScheduledDirectRequest => _trip.isScheduledDirectRequest;
 
   String get _pageTitle =>
-      widget.fromHome ? 'Solicitação de corrida' : 'Detalhes do agendamento';
+      widget.fromHome ? 'Solicitação de viagem' : 'Detalhes do agendamento';
 
   @override
   void initState() {
@@ -136,7 +139,9 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
   void _handleRemoteCancellation() {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Esta corrida foi cancelada pela KZ.')),
+      const SnackBar(
+        content: Text('Esta viagem foi cancelada pela ${AppBrand.name}.'),
+      ),
     );
     context.go('/home');
   }
@@ -191,7 +196,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
       Marker(
         markerId: const MarkerId('origin'),
         position: origin,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
       ),
       Marker(
         markerId: const MarkerId('destination'),
@@ -315,8 +320,8 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
           ok
               ? (_isDriverRecheck
                     ? 'Agendamento confirmado!'
-                    : 'Corrida aceita com sucesso!')
-              : 'Erro ao aceitar corrida',
+                    : 'Viagem aceite com sucesso!')
+              : 'Erro ao aceitar viagem',
         ),
         backgroundColor: ok ? const Color(0xFF2ECC71) : Colors.red.shade400,
       ),
@@ -376,7 +381,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'Corrida recusada' : 'Erro ao recusar corrida'),
+        content: Text(ok ? 'Viagem recusada' : 'Erro ao recusar viagem'),
         backgroundColor: ok ? Colors.red.shade400 : Colors.orange,
       ),
     );
@@ -398,7 +403,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
         '/chat/$roomId',
         extra: ChatPageArgs(
           roomId: roomId,
-          title: 'Corrida agendada',
+          title: 'Viagem agendada',
           subtitle: '${_trip.origin} → ${_trip.destination}',
           clientName: _trip.clientName,
           clientAvatarUrl: _trip.clientAvatarUrl,
@@ -497,7 +502,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
 
   Future<void> _callPhone(String phone) async {
     final ok = await launchUrl(
-      Uri.parse('tel:$phone'),
+      Uri.parse('tel:${dialablePhone(phone)}'),
       mode: LaunchMode.externalApplication,
     );
     if (!ok && mounted) {
@@ -516,9 +521,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
   }
 
   Future<void> _openWhatsApp(String phone) async {
-    final digits = phone.replaceAll(RegExp(r'\D'), '');
-    final whatsappPhone = digits.startsWith('55') ? digits : '55$digits';
-    final uri = Uri.parse('https://wa.me/$whatsappPhone');
+    final uri = Uri.parse('https://wa.me/${whatsappDigits(phone)}');
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -601,9 +604,9 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.highlight,
-                    foregroundColor: Colors.black,
+                    foregroundColor: AppColors.onHighlight,
                   ),
-                  child: const Text('Salvar'),
+                  child: const Text('Guardar'),
                 ),
               ],
             );
@@ -648,7 +651,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-          'Não é possivel editar o valor de uma corrida que ja foi aceita pela KZ, favor acionar suporte',
+          'Não é possível editar o valor de uma viagem que já foi aceite pela ${AppBrand.name}. Contacte o suporte.',
         ),
       ),
     );
@@ -692,7 +695,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
         ),
         actions: [
           IconButton(
-            tooltip: 'Chat com a KZ',
+            tooltip: 'Chat com o suporte',
             onPressed: () => context.push('/support-chat'),
             icon: const Icon(
               Icons.support_agent_rounded,
@@ -801,7 +804,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
                       _InfoRow(label: 'Nome', value: _trip.clientName),
                       _InfoRow(
                         label: 'Passageiros',
-                        value: '${_trip.passengerCount}',
+                        value: '${_trip.regularPassengerCount}',
                       ),
                     ],
                   ),
@@ -840,17 +843,12 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
                       children: [
                         _InfoRow(
                           label: 'Quantidade',
-                          value: '${_trip.childrenCount}',
+                          value: '${_trip.displayChildrenCount}',
                         ),
-                        if (_trip.children.isNotEmpty)
+                        if (_trip.childLabels.isNotEmpty)
                           _InfoRow(
-                            label: 'Detalhes',
-                            value: _trip.children
-                                .map(
-                                  (c) =>
-                                      '${c.age} anos${c.needsCarSeat ? ' (cadeirinha)' : ''}',
-                                )
-                                .join(', '),
+                            label: 'Atenção',
+                            value: _trip.childLabels.join(', '),
                           ),
                       ],
                     ),
@@ -869,9 +867,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
                         if (_trip.luggage.isNotEmpty)
                           _InfoRow(
                             label: 'Detalhes',
-                            value: _trip.luggage
-                                .map((l) => '${l.quantity}x ${l.size}')
-                                .join(', '),
+                            value: _trip.luggageLabels.join(', '),
                           ),
                       ],
                     ),
@@ -888,7 +884,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
                       ),
                       _InfoRow(
                         label: 'Valor estimado',
-                        value: 'R\$ ${_trip.price.toStringAsFixed(2)}',
+                        value: formatKz(_trip.price),
                       ),
                     ],
                   ),
@@ -943,7 +939,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
                               ),
                               const SizedBox(width: 8),
                               const Text(
-                                'Sua observação',
+                                'A sua observação',
                                 style: TextStyle(
                                   fontFamily: 'OutfitBlack',
                                   fontSize: 14,
@@ -1248,9 +1244,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
           child: _MetricTile(
             icon: Icons.payments_outlined,
             label: 'Base',
-            value: _trip.price > 0
-                ? 'R\$ ${_trip.price.toStringAsFixed(2)}'
-                : '-',
+            value: _trip.price > 0 ? formatKz(_trip.price) : '-',
           ),
         ),
       ],
@@ -1259,7 +1253,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
 
   Widget _buildRouteTimeline() {
     return _SectionCard(
-      title: 'Rota da corrida',
+      title: 'Rota da viagem',
       icon: Icons.route_outlined,
       children: [
         _RouteStopRow(
@@ -1286,7 +1280,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
             color: AppColors.secondary,
             label: 'Retorno',
             address: _trip.returnAt == null
-                ? 'Corrida de ida e volta'
+                ? 'Viagem de ida e volta'
                 : 'Retorno previsto em ${_formatShortDateTime(_trip.returnAt!)}',
           ),
           const _RouteDivider(),
@@ -1305,12 +1299,12 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
     final chips = <Widget>[
       _DetailChip(
         icon: Icons.people_outline_rounded,
-        label: '${_trip.passengerCount} passageiro(s)',
+        label: '${_trip.regularPassengerCount} passageiro(s)',
       ),
       if (_trip.hasChildren)
         _DetailChip(
           icon: Icons.child_care_rounded,
-          label: '${_trip.childrenCount} criança(s)',
+          label: '${_trip.displayChildrenCount} criança(s)',
         ),
       if (_trip.hasLuggage)
         _DetailChip(
@@ -1329,28 +1323,22 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
       icon: Icons.person_outline,
       children: [
         _InfoRow(label: 'Cliente', value: _trip.clientName),
+        if (_trip.passengerLabels.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          _InfoRow(
+            label: 'Passageiros',
+            value: _trip.passengerLabels.join(', '),
+          ),
+        ],
         const SizedBox(height: 8),
         Wrap(spacing: 8, runSpacing: 8, children: chips),
-        if (_trip.children.isNotEmpty) ...[
+        if (_trip.childLabels.isNotEmpty) ...[
           const SizedBox(height: 10),
-          _InfoRow(
-            label: 'Crianças',
-            value: _trip.children
-                .map(
-                  (c) =>
-                      '${c.age} anos${c.needsCarSeat ? ' com cadeirinha' : ''}',
-                )
-                .join(', '),
-          ),
+          _InfoRow(label: 'Crianças', value: _trip.childLabels.join(', ')),
         ],
         if (_trip.luggage.isNotEmpty) ...[
           const SizedBox(height: 6),
-          _InfoRow(
-            label: 'Bagagem',
-            value: _trip.luggage
-                .map((l) => '${l.quantity}x ${l.size}')
-                .join(', '),
-          ),
+          _InfoRow(label: 'Bagagem', value: _trip.luggageLabels.join(', ')),
         ],
         if (_trip.observations != null && _trip.observations!.isNotEmpty) ...[
           const SizedBox(height: 10),
@@ -1398,7 +1386,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Seu valor',
+                  'O seu valor',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -1407,7 +1395,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}',
+                  formatKz(value),
                   style: const TextStyle(
                     fontFamily: 'OutfitBlack',
                     fontSize: 18,
@@ -1474,7 +1462,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
               Text(
                 _isDriverRecheck
                     ? 'Valor confirmado pelo cliente'
-                    : 'Seu valor para esta corrida',
+                    : 'O seu valor para esta viagem',
                 style: const TextStyle(
                   fontFamily: 'OutfitBlack',
                   fontSize: 15,
@@ -1501,8 +1489,8 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
               helperText: _isDriverRecheck
                   ? 'Valor ja definido na confirmacao do cliente'
                   : hasKzProposal
-                  ? 'Proposta feita pela KZ'
-                  : 'Obrigatório para enviar sua proposta',
+                  ? 'Proposta feita pela ${AppBrand.name}'
+                  : 'Obrigatório para enviar a sua proposta',
               errorText: _priceError
                   ? 'Informe um valor antes de aceitar'
                   : null,
@@ -1582,9 +1570,9 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Iniciar corrida?'),
+        title: const Text('Iniciar viagem?'),
         content: const Text(
-          'Confirme somente quando estiver a caminho do embarque. Esta ação não pode ser desfeita pelo aplicativo.',
+          'Confirme somente quando estiver a caminho do embarque. Esta ação não pode ser desfeita pela aplicação.',
         ),
         actions: [
           TextButton(
@@ -1661,7 +1649,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
       );
       if (!mounted) return;
       final draft = Uri.encodeComponent(
-        'Olá, preciso cancelar a corrida de ${_trip.origin} para ${_trip.destination}. Motivo informado: $reason',
+        'Olá, preciso cancelar a viagem de ${_trip.origin} para ${_trip.destination}. Motivo informado: $reason',
       );
       context.push('/support-chat?draft=$draft');
     } catch (_) {
@@ -1774,7 +1762,7 @@ class _ScheduleDetailPageState extends State<ScheduleDetailPage>
                         ),
                       )
                     : const Text(
-                        'Iniciar corrida',
+                        'Iniciar viagem',
                         style: TextStyle(
                           fontFamily: 'OutfitBlack',
                           fontSize: 15,

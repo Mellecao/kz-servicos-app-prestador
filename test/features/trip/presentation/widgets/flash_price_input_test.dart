@@ -5,11 +5,11 @@ import 'package:kz_servicos_prestador/features/trip/presentation/widgets/flash_p
 void main() {
   testWidgets('emits parsed price on tap Enviar', (tester) async {
     double? out;
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: FlashPriceInput(onSubmit: (v) => out = v),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: FlashPriceInput(onSubmit: (v) => out = v)),
       ),
-    ));
+    );
     await tester.enterText(find.byType(TextField), '45.5');
     await tester.tap(find.text('Enviar proposta'));
     await tester.pump();
@@ -18,11 +18,11 @@ void main() {
 
   testWidgets('accepts comma as decimal separator', (tester) async {
     double? out;
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: FlashPriceInput(onSubmit: (v) => out = v),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: FlashPriceInput(onSubmit: (v) => out = v)),
       ),
-    ));
+    );
     await tester.enterText(find.byType(TextField), '30,75');
     await tester.tap(find.text('Enviar proposta'));
     await tester.pump();
@@ -31,11 +31,11 @@ void main() {
 
   testWidgets('shows error on invalid input and does not emit', (tester) async {
     double? out;
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: FlashPriceInput(onSubmit: (v) => out = v),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: FlashPriceInput(onSubmit: (v) => out = v)),
       ),
-    ));
+    );
     await tester.enterText(find.byType(TextField), 'abc');
     await tester.tap(find.text('Enviar proposta'));
     await tester.pump();
@@ -45,11 +45,11 @@ void main() {
 
   testWidgets('rejects zero and negative values', (tester) async {
     double? out;
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: FlashPriceInput(onSubmit: (v) => out = v),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: FlashPriceInput(onSubmit: (v) => out = v)),
       ),
-    ));
+    );
     await tester.enterText(find.byType(TextField), '0');
     await tester.tap(find.text('Enviar proposta'));
     await tester.pump();

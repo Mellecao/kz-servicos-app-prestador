@@ -3,6 +3,7 @@ import 'dart:js_interop';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:kz_servicos_prestador/features/trip/data/models/route_result.dart';
 import 'package:kz_servicos_prestador/features/trip/data/services/google_maps_js_types.dart';
+import 'package:kz_servicos_prestador/core/constants/app_geo.dart';
 
 class DirectionsService {
   JsDirectionsSvc? _service;
@@ -26,6 +27,7 @@ class DirectionsService {
                 'lng': destination.longitude,
               },
               'travelMode': 'DRIVING',
+              'region': AppGeo.regionCode,
               if (waypoints.isNotEmpty)
                 'waypoints': waypoints
                     .map(

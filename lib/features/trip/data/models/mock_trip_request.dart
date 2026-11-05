@@ -71,7 +71,7 @@ class MockTripRequest {
       estimatedPrice: 185.00,
       distanceKm: 32.5,
       driverDistanceKm: 4.2,
-      paymentMethod: 'PIX',
+      paymentMethod: 'Numerário',
       status: 'pending',
     ),
     MockTripRequest(

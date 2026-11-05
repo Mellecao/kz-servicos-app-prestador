@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kz_servicos_prestador/core/constants/app_brand.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 
 class CancelTripSheet extends StatefulWidget {
@@ -59,7 +60,7 @@ class _CancelTripSheetState extends State<CancelTripSheet> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'Descreva o motivo (mínimo 10 caracteres). A corrida continuará ativa até a resposta da KZ.',
+              'Descreva o motivo (mínimo 10 caracteres). A viagem continuará ativa até à resposta da ${AppBrand.name}.',
               style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),

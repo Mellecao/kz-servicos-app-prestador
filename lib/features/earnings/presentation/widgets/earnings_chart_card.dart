@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
+import 'package:kz_servicos_prestador/core/utils/kz_format.dart';
 
 class EarningsChartCard extends StatefulWidget {
   final List<MonthlyEarning> monthlyHistory;
@@ -24,8 +25,18 @@ class _EarningsChartCardState extends State<EarningsChartCard>
   late Animation<double> _animation;
 
   static const _monthNames = [
-    'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-    'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
+    'Jan',
+    'Fev',
+    'Mar',
+    'Abr',
+    'Mai',
+    'Jun',
+    'Jul',
+    'Ago',
+    'Set',
+    'Out',
+    'Nov',
+    'Dez',
   ];
 
   @override
@@ -91,7 +102,7 @@ class _EarningsChartCardState extends State<EarningsChartCard>
               if (widget.monthOverMonthDiff != 0) ...[
                 const SizedBox(width: 8),
                 Text(
-                  '${widget.monthOverMonthDiff > 0 ? '+' : ''}R\$ ${widget.monthOverMonthDiff.abs().toStringAsFixed(2)} que no mês anterior',
+                  '${widget.monthOverMonthDiff > 0 ? '+' : '-'}${formatKz(widget.monthOverMonthDiff.abs())} face ao mês anterior',
                   style: TextStyle(
                     fontSize: 11,
                     color: widget.monthOverMonthDiff >= 0
@@ -145,9 +156,7 @@ class _EarningsChartCardState extends State<EarningsChartCard>
             builder: (context, _) {
               return SizedBox(
                 height: _showAnnual ? 200 : 180,
-                child: _showAnnual
-                    ? _buildLineChart()
-                    : _buildBarChart(),
+                child: _showAnnual ? _buildLineChart() : _buildBarChart(),
               );
             },
           ),
@@ -177,7 +186,7 @@ class _EarningsChartCardState extends State<EarningsChartCard>
               getTitlesWidget: (value, meta) {
                 if (value == 0) return const SizedBox.shrink();
                 return Text(
-                  'R\$${(value / 1000).toStringAsFixed(1)}k',
+                  formatKzCompact(value),
                   style: const TextStyle(
                     fontSize: 10,
                     color: AppColors.textSecondary,
@@ -213,10 +222,8 @@ class _EarningsChartCardState extends State<EarningsChartCard>
           show: true,
           drawVerticalLine: false,
           horizontalInterval: _maxValue / 4,
-          getDrawingHorizontalLine: (value) => FlLine(
-            color: Colors.grey.shade200,
-            strokeWidth: 1,
-          ),
+          getDrawingHorizontalLine: (value) =>
+              FlLine(color: Colors.grey.shade200, strokeWidth: 1),
         ),
         borderData: FlBorderData(show: false),
         barGroups: List.generate(months.length, (i) {
@@ -268,7 +275,7 @@ class _EarningsChartCardState extends State<EarningsChartCard>
               getTitlesWidget: (value, meta) {
                 if (value == 0) return const SizedBox.shrink();
                 return Text(
-                  'R\$${(value / 1000).toStringAsFixed(1)}k',
+                  formatKzCompact(value),
                   style: const TextStyle(
                     fontSize: 10,
                     color: AppColors.textSecondary,
@@ -303,19 +310,14 @@ class _EarningsChartCardState extends State<EarningsChartCard>
           show: true,
           drawVerticalLine: false,
           horizontalInterval: _maxValue / 4,
-          getDrawingHorizontalLine: (value) => FlLine(
-            color: Colors.grey.shade200,
-            strokeWidth: 1,
-          ),
+          getDrawingHorizontalLine: (value) =>
+              FlLine(color: Colors.grey.shade200, strokeWidth: 1),
         ),
         borderData: FlBorderData(show: false),
         lineBarsData: [
           LineChartBarData(
             spots: List.generate(months.length, (i) {
-              return FlSpot(
-                i.toDouble(),
-                months[i].total * _animation.value,
-              );
+              return FlSpot(i.toDouble(), months[i].total * _animation.value);
             }),
             isCurved: true,
             curveSmoothness: 0.3,

@@ -61,7 +61,9 @@ class DriverProfileData {
 
     VehicleData? vehicle;
     if (vehiclesList != null && vehiclesList.isNotEmpty) {
-      final activeVehicle = vehiclesList.cast<Map<String, dynamic>>().firstWhere(
+      final activeVehicle = vehiclesList
+          .cast<Map<String, dynamic>>()
+          .firstWhere(
             (v) => v['is_active'] == true,
             orElse: () => vehiclesList.first as Map<String, dynamic>,
           );
@@ -151,14 +153,13 @@ class VehicleData {
       photos.map((photo) => photo.url).toList(growable: false);
 
   factory VehicleData.fromMap(Map<String, dynamic> map) => VehicleData(
-        id: map['id'] as String,
-        brand: map['brand'] as String? ?? '',
-        model: map['model'] as String? ?? '',
-        year: (map['year'] as num?)?.toInt() ?? 0,
-        color: map['color'] as String? ?? '',
-        licensePlate: map['license_plate'] as String? ?? '',
-        passengerCapacity:
-            (map['passenger_capacity'] as num?)?.toInt() ?? 4,
-        photos: DriverProfileData._photos(map['vehicle_photos'] as List?),
-      );
+    id: map['id'] as String,
+    brand: map['brand'] as String? ?? '',
+    model: map['model'] as String? ?? '',
+    year: (map['year'] as num?)?.toInt() ?? 0,
+    color: map['color'] as String? ?? '',
+    licensePlate: map['license_plate'] as String? ?? '',
+    passengerCapacity: (map['passenger_capacity'] as num?)?.toInt() ?? 4,
+    photos: DriverProfileData._photos(map['vehicle_photos'] as List?),
+  );
 }

@@ -31,12 +31,16 @@ class SecuritySettingsPage extends StatelessWidget {
           children: [
             _SettingTile(
               icon: Icons.lock_outline,
-              title: 'Alterar senha',
-              subtitle: 'Atualize sua senha de acesso',
+              title: 'Alterar palavra-passe',
+              subtitle: 'Atualize a sua palavra-passe de acesso',
               onTap: () => _showChangeDialog(
                 context,
-                title: 'Alterar senha',
-                fields: ['Senha atual', 'Nova senha', 'Confirmar nova senha'],
+                title: 'Alterar palavra-passe',
+                fields: [
+                  'Palavra-passe atual',
+                  'Nova palavra-passe',
+                  'Confirmar nova palavra-passe',
+                ],
                 obscure: true,
               ),
             ),
@@ -44,30 +48,30 @@ class SecuritySettingsPage extends StatelessWidget {
             _SettingTile(
               icon: Icons.email_outlined,
               title: 'Alterar e-mail',
-              subtitle: 'Atualize seu endereço de e-mail',
+              subtitle: 'Atualize o seu endereço de e-mail',
               onTap: () => _showChangeDialog(
                 context,
                 title: 'Alterar e-mail',
-                fields: ['Novo e-mail', 'Senha para confirmar'],
+                fields: ['Novo e-mail', 'Palavra-passe para confirmar'],
                 obscure: false,
               ),
             ),
             const SizedBox(height: 12),
             _SettingTile(
               icon: Icons.phone_outlined,
-              title: 'Alterar telefone',
-              subtitle: 'Atualize seu número de telefone',
+              title: 'Alterar telemóvel',
+              subtitle: 'Atualize o seu número de telemóvel',
               onTap: () => _showChangeDialog(
                 context,
-                title: 'Alterar telefone',
-                fields: ['Novo telefone', 'Senha para confirmar'],
+                title: 'Alterar telemóvel',
+                fields: ['Novo telemóvel', 'Palavra-passe para confirmar'],
                 obscure: false,
               ),
             ),
             const SizedBox(height: 32),
             _SettingTile(
               icon: Icons.delete_forever_outlined,
-              title: 'Excluir conta',
+              title: 'Eliminar conta',
               subtitle: 'Esta ação é irreversível',
               color: Colors.red.shade400,
               onTap: () => _showDeleteConfirmation(context),
@@ -93,10 +97,7 @@ class SecuritySettingsPage extends StatelessWidget {
           ),
           title: Text(
             title,
-            style: const TextStyle(
-              fontFamily: 'OutfitBlack',
-              fontSize: 18,
-            ),
+            style: const TextStyle(fontFamily: 'OutfitBlack', fontSize: 18),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -104,7 +105,8 @@ class SecuritySettingsPage extends StatelessWidget {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: TextField(
-                  obscureText: obscure && field.toLowerCase().contains('senha'),
+                  obscureText:
+                      obscure && field.toLowerCase().contains('palavra-passe'),
                   decoration: InputDecoration(
                     labelText: field,
                     filled: true,
@@ -137,7 +139,7 @@ class SecuritySettingsPage extends StatelessWidget {
                 ),
               ),
               child: const Text(
-                'Salvar',
+                'Guardar',
                 style: TextStyle(color: Colors.white),
               ),
             ),
@@ -156,7 +158,7 @@ class SecuritySettingsPage extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           title: const Text(
-            'Excluir conta',
+            'Eliminar conta',
             style: TextStyle(
               fontFamily: 'OutfitBlack',
               fontSize: 18,
@@ -164,7 +166,7 @@ class SecuritySettingsPage extends StatelessWidget {
             ),
           ),
           content: const Text(
-            'Tem certeza que deseja excluir sua conta? '
+            'Tem a certeza de que pretende eliminar a sua conta? '
             'Todos os dados serão perdidos permanentemente.',
           ),
           actions: [
@@ -181,7 +183,7 @@ class SecuritySettingsPage extends StatelessWidget {
                 ),
               ),
               child: const Text(
-                'Excluir',
+                'Eliminar',
                 style: TextStyle(color: Colors.white),
               ),
             ),

@@ -18,7 +18,7 @@ class BenefitDiscountCode {
   });
 
   static String buildCode({required int sequenceNumber}) {
-    return 'KZBEN-${sequenceNumber.toString().padLeft(6, '0')}';
+    return 'SSBEN-${sequenceNumber.toString().padLeft(6, '0')}';
   }
 
   static String buildRandomCode({Random? random}) {
@@ -28,7 +28,7 @@ class BenefitDiscountCode {
       6,
       (_) => chars[generator.nextInt(chars.length)],
     ).join();
-    return 'KZ-$suffix';
+    return 'SS-$suffix';
   }
 
   factory BenefitDiscountCode.fromMap(Map<String, dynamic> map) {

@@ -5,7 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 
 abstract final class CustomMapMarkers {
-  static Future<BitmapDescriptor> createYellowPinIcon() async {
+  static Future<BitmapDescriptor> createBrandPinIcon() async {
     const width = 32.0;
     const height = 44.0;
     final recorder = ui.PictureRecorder();
@@ -25,13 +25,11 @@ abstract final class CustomMapMarkers {
     );
     final picture = recorder.endRecording();
     final image = await picture.toImage(width.toInt(), height.toInt());
-    final byteData = await image.toByteData(
-      format: ui.ImageByteFormat.png,
-    );
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
   }
 
-  static Future<BitmapDescriptor> createYellowCircleIcon() async {
+  static Future<BitmapDescriptor> createBrandCircleIcon() async {
     const size = 28.0;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -52,9 +50,7 @@ abstract final class CustomMapMarkers {
     );
     final picture = recorder.endRecording();
     final image = await picture.toImage(size.toInt(), size.toInt());
-    final byteData = await image.toByteData(
-      format: ui.ImageByteFormat.png,
-    );
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
   }
 
@@ -79,9 +75,7 @@ abstract final class CustomMapMarkers {
     );
     final picture = recorder.endRecording();
     final image = await picture.toImage(size.toInt(), size.toInt());
-    final byteData = await image.toByteData(
-      format: ui.ImageByteFormat.png,
-    );
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
   }
 
@@ -106,10 +100,10 @@ abstract final class CustomMapMarkers {
 
     // Seta de navegação (chevron apontando para cima)
     final arrowPath = Path()
-      ..moveTo(size / 2, 7)          // ponta superior
-      ..lineTo(size - 8, size - 7)   // canto inferior direito
-      ..lineTo(size / 2, size - 15)  // entalhe inferior central
-      ..lineTo(8, size - 7)          // canto inferior esquerdo
+      ..moveTo(size / 2, 7) // ponta superior
+      ..lineTo(size - 8, size - 7) // canto inferior direito
+      ..lineTo(size / 2, size - 15) // entalhe inferior central
+      ..lineTo(8, size - 7) // canto inferior esquerdo
       ..close();
 
     canvas.drawPath(arrowPath, Paint()..color = Colors.white);

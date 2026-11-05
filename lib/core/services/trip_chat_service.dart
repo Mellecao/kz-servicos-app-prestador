@@ -290,7 +290,7 @@ class TripChatService {
     final scheduledStr = row['scheduled_datetime'] as String?;
     final title = scheduledStr != null
         ? _formatTripTitle(DateTime.parse(scheduledStr))
-        : 'Corrida';
+        : 'Viagem';
 
     return ChatEntryData(
       referenceId: row['id'] as String,
@@ -365,7 +365,7 @@ class TripChatService {
     final month = dt.month.toString().padLeft(2, '0');
     final hour = dt.hour.toString().padLeft(2, '0');
     final minute = dt.minute.toString().padLeft(2, '0');
-    return 'Corrida · $day/$month às $hour:$minute';
+    return 'Viagem · $day/$month às $hour:$minute';
   }
 
   static String _formatDateShort(DateTime dt) {

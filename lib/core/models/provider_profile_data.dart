@@ -45,8 +45,9 @@ class ProviderProfileData {
         providerProfile['provider_category_services'] as List? ?? [];
     final categoryNames = <String>[];
     for (final cs in categoryServices) {
-      final cat = (cs as Map<String, dynamic>)['service_categories']
-          as Map<String, dynamic>?;
+      final cat =
+          (cs as Map<String, dynamic>)['service_categories']
+              as Map<String, dynamic>?;
       final name = cat?['name'] as String?;
       if (name != null && name.isNotEmpty) categoryNames.add(name);
     }
@@ -67,8 +68,7 @@ class ProviderProfileData {
       avatarUrl: map['avatar_url'] as String?,
       averageRating:
           (providerProfile['average_rating'] as num?)?.toDouble() ?? 0,
-      totalRatings:
-          (providerProfile['total_ratings'] as num?)?.toInt() ?? 0,
+      totalRatings: (providerProfile['total_ratings'] as num?)?.toInt() ?? 0,
       bio: providerProfile['bio'] as String?,
       bankName: providerProfile['bank_name'] as String?,
       bankAgency: providerProfile['bank_agency'] as String?,

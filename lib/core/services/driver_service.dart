@@ -22,7 +22,10 @@ class DriverService {
     }
   }
 
-  Future<bool> updateAvailability(String driverProfileId, bool isAvailable) async {
+  Future<bool> updateAvailability(
+    String driverProfileId,
+    bool isAvailable,
+  ) async {
     try {
       await _client
           .from('driver_profiles')

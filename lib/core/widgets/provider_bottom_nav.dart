@@ -19,7 +19,7 @@ class ProviderBottomNav extends StatefulWidget {
     (icon: Icons.calendar_month_rounded, label: 'Agenda'),
     (icon: Icons.account_balance_wallet_rounded, label: 'Ganhos'),
     (icon: Icons.person_rounded, label: 'Perfil'),
-    (icon: Icons.support_agent_rounded, label: 'Chat KZ'),
+    (icon: Icons.support_agent_rounded, label: 'Suporte'),
   ];
 
   @override
@@ -102,49 +102,54 @@ class _NavItem extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 320),
-            curve: Curves.easeOutCubic,
-            width: isSelected ? 56 : 44,
-            height: isSelected ? 56 : 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isSelected
-                  ? AppColors.highlight.withValues(alpha: 0.85)
-                  : Colors.transparent,
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: AppColors.highlight.withValues(alpha: 0.40),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
+        // Altura fixa: sem ela o Center expande até à altura máxima que o
+        // Scaffold oferece e a barra passa a ocupar o ecrã todo.
+        child: SizedBox(
+          height: 56,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              width: isSelected ? 56 : 44,
+              height: isSelected ? 56 : 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected
+                    ? AppColors.highlight.withValues(alpha: 0.85)
+                    : Colors.transparent,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.highlight.withValues(alpha: 0.40),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Center(
+                    child: AnimatedScale(
+                      scale: isSelected ? 1.15 : 0.9,
+                      duration: const Duration(milliseconds: 320),
+                      curve: Curves.easeOutCubic,
+                      child: Icon(
+                        icon,
+                        color: isSelected ? Colors.white : Colors.black45,
+                        size: 24,
                       ),
-                    ]
-                  : [],
-            ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Center(
-                  child: AnimatedScale(
-                    scale: isSelected ? 1.15 : 0.9,
-                    duration: const Duration(milliseconds: 320),
-                    curve: Curves.easeOutCubic,
-                    child: Icon(
-                      icon,
-                      color: isSelected ? Colors.white : Colors.black45,
-                      size: 24,
                     ),
                   ),
-                ),
-                if (badgeCount > 0)
-                  Positioned(
-                    top: -6,
-                    right: -8,
-                    child: _NavBadge(count: badgeCount),
-                  ),
-              ],
+                  if (badgeCount > 0)
+                    Positioned(
+                      top: -6,
+                      right: -8,
+                      child: _NavBadge(count: badgeCount),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

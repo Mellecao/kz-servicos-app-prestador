@@ -48,12 +48,11 @@ class MockSchedule {
   });
 
   String get statusLabel => switch (status) {
-        ScheduleStatus.awaitingClientApproval =>
-          'Aguardando aprovação do cliente',
-        ScheduleStatus.awaitingDriverConfirmation =>
-          'Aguardando confirmação do motorista',
-        ScheduleStatus.scheduled => 'Viagem agendada',
-      };
+    ScheduleStatus.awaitingClientApproval => 'A aguardar aprovação do cliente',
+    ScheduleStatus.awaitingDriverConfirmation =>
+      'A aguardar confirmação do motorista',
+    ScheduleStatus.scheduled => 'Viagem agendada',
+  };
 
   static final List<MockSchedule> samples = [
     MockSchedule(
@@ -67,7 +66,7 @@ class MockSchedule {
       destinationLng: -46.4731,
       scheduledDate: DateTime(2026, 4, 18, 6, 30),
       price: 185.00,
-      paymentMethod: 'PIX',
+      paymentMethod: 'Numerário',
       passengers: 2,
       hasChildren: false,
       hasLuggage: true,
@@ -124,7 +123,7 @@ class MockSchedule {
       destinationLng: -46.6576,
       scheduledDate: DateTime(2026, 4, 20, 9, 0),
       price: 28.00,
-      paymentMethod: 'PIX',
+      paymentMethod: 'Numerário',
       passengers: 2,
       hasChildren: false,
       hasLuggage: false,

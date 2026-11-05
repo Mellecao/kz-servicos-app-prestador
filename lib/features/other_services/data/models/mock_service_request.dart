@@ -42,7 +42,7 @@ class MockServiceRequest {
     MockServiceRequest(
       id: 'sr_2',
       clientName: 'Ana Beatriz',
-      category: 'Encanador',
+      category: 'Canalizador',
       categoryColor: const Color(0xFF3498DB),
       problemDescription:
           'Vazamento embaixo da pia da cozinha, '

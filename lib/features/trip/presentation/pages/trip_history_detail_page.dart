@@ -6,6 +6,7 @@ import 'package:kz_servicos_prestador/core/constants/map_styles.dart';
 import 'package:kz_servicos_prestador/core/maps/kz_map.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/features/trip/data/services/directions_service.dart';
+import 'package:kz_servicos_prestador/core/utils/kz_format.dart';
 
 class TripHistoryDetailPage extends StatefulWidget {
   final TripData trip;
@@ -70,7 +71,7 @@ class _TripHistoryDetailPageState extends State<TripHistoryDetailPage> {
           onPressed: () => context.pop(),
         ),
         title: const Text(
-          'Detalhes da corrida',
+          'Detalhes da viagem',
           style: TextStyle(
             fontFamily: 'OutfitBlack',
             fontSize: 20,
@@ -101,13 +102,15 @@ class _TripHistoryDetailPageState extends State<TripHistoryDetailPage> {
                       markerId: const MarkerId('pickup'),
                       position: origin,
                       icon: BitmapDescriptor.defaultMarkerWithHue(
-                          BitmapDescriptor.hueOrange),
+                        BitmapDescriptor.hueOrange,
+                      ),
                     ),
                     Marker(
                       markerId: const MarkerId('destination'),
                       position: destination,
                       icon: BitmapDescriptor.defaultMarkerWithHue(
-                          BitmapDescriptor.hueOrange),
+                        BitmapDescriptor.hueOrange,
+                      ),
                     ),
                   },
                   polylines: _polylines,
@@ -142,11 +145,13 @@ class _TripHistoryDetailPageState extends State<TripHistoryDetailPage> {
               ),
               child: Column(
                 children: [
-                  const Text('Valor da corrida',
-                      style: TextStyle(fontSize: 13, color: Colors.white70)),
+                  const Text(
+                    'Valor da viagem',
+                    style: TextStyle(fontSize: 13, color: Colors.white70),
+                  ),
                   const SizedBox(height: 4),
                   Text(
-                    'R\$ ${t.price.toStringAsFixed(2)}',
+                    formatKz(t.price),
                     style: const TextStyle(
                       fontFamily: 'OutfitBlack',
                       fontSize: 28,
@@ -163,7 +168,9 @@ class _TripHistoryDetailPageState extends State<TripHistoryDetailPage> {
                         Text(
                           t.rating!.toStringAsFixed(1),
                           style: const TextStyle(
-                              color: Colors.white70, fontSize: 13),
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
@@ -173,100 +180,116 @@ class _TripHistoryDetailPageState extends State<TripHistoryDetailPage> {
             ),
             const SizedBox(height: 16),
 
-            _SectionCard(children: [
-              _DetailRow(
-                icon: Icons.person,
-                label: 'Cliente',
-                value: t.clientName,
-              ),
-              _DetailRow(
-                icon: Icons.people,
-                label: 'Passageiros',
-                value: '${t.passengerCount}',
-              ),
-            ]),
+            _SectionCard(
+              children: [
+                _DetailRow(
+                  icon: Icons.person,
+                  label: 'Cliente',
+                  value: t.clientName,
+                ),
+                _DetailRow(
+                  icon: Icons.people,
+                  label: 'Passageiros',
+                  value: '${t.passengerCount}',
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
 
-            _SectionCard(children: [
-              _DetailRow(
-                icon: Icons.trip_origin,
-                label: 'Embarque',
-                value: t.origin,
-                iconColor: AppColors.highlight,
-              ),
-              _DetailRow(
-                icon: Icons.flag_rounded,
-                label: 'Destino',
-                value: t.destination,
-                iconColor: AppColors.highlight,
-              ),
-            ]),
+            _SectionCard(
+              children: [
+                _DetailRow(
+                  icon: Icons.trip_origin,
+                  label: 'Embarque',
+                  value: t.origin,
+                  iconColor: AppColors.highlight,
+                ),
+                _DetailRow(
+                  icon: Icons.flag_rounded,
+                  label: 'Destino',
+                  value: t.destination,
+                  iconColor: AppColors.highlight,
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
 
-            _SectionCard(children: [
-              _DetailRow(
-                icon: Icons.calendar_today,
-                label: 'Data',
-                value:
-                    '${completedAt.day.toString().padLeft(2, '0')}/${completedAt.month.toString().padLeft(2, '0')}/${completedAt.year}',
-              ),
-              _DetailRow(
-                icon: Icons.access_time,
-                label: 'Horário',
-                value:
-                    '${completedAt.hour.toString().padLeft(2, '0')}:${completedAt.minute.toString().padLeft(2, '0')}',
-              ),
-            ]),
+            _SectionCard(
+              children: [
+                _DetailRow(
+                  icon: Icons.calendar_today,
+                  label: 'Data',
+                  value:
+                      '${completedAt.day.toString().padLeft(2, '0')}/${completedAt.month.toString().padLeft(2, '0')}/${completedAt.year}',
+                ),
+                _DetailRow(
+                  icon: Icons.access_time,
+                  label: 'Horário',
+                  value:
+                      '${completedAt.hour.toString().padLeft(2, '0')}:${completedAt.minute.toString().padLeft(2, '0')}',
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
 
-            _SectionCard(children: [
-              _DetailRow(
-                icon: _paymentIcon(t.paymentMethod ?? ''),
-                label: 'Pagamento',
-                value: t.paymentMethodLabel,
-              ),
-            ]),
+            _SectionCard(
+              children: [
+                _DetailRow(
+                  icon: _paymentIcon(t.paymentMethod ?? ''),
+                  label: 'Pagamento',
+                  value: t.paymentMethodLabel,
+                ),
+              ],
+            ),
 
             if (t.hasChildren) ...[
               const SizedBox(height: 12),
-              _SectionCard(children: [
-                _DetailRow(
-                  icon: Icons.child_care,
-                  label: 'Crianças',
-                  value: t.children.isNotEmpty
-                      ? t.children
-                          .map((c) =>
-                              '${c.age} anos${c.needsCarSeat ? ' (cadeirinha)' : ''}')
-                          .join(', ')
-                      : '${t.childrenCount}',
-                ),
-              ]),
+              _SectionCard(
+                children: [
+                  _DetailRow(
+                    icon: Icons.child_care,
+                    label: 'Crianças',
+                    value: t.children.isNotEmpty
+                        ? t.children
+                              .map(
+                                (c) =>
+                                    '${c.age} anos${c.needsCarSeat ? ' (cadeirinha)' : ''}',
+                              )
+                              .join(', ')
+                        : '${t.childrenCount}',
+                  ),
+                ],
+              ),
             ],
 
             if (t.hasLuggage) ...[
               const SizedBox(height: 12),
-              _SectionCard(children: [
-                _DetailRow(
-                  icon: Icons.luggage,
-                  label: 'Bagagem',
-                  value: t.luggage.isNotEmpty
-                      ? t.luggage
-                          .map((l) => '${l.quantity}x ${l.size}')
-                          .join(', ')
-                      : '${t.luggageCount} volume(s)',
-                ),
-              ]),
+              _SectionCard(
+                children: [
+                  _DetailRow(
+                    icon: Icons.luggage,
+                    label: 'Bagagem',
+                    value: t.luggage.isNotEmpty
+                        ? t.luggage
+                              .map((l) => '${l.quantity}x ${l.size}')
+                              .join(', ')
+                        : '${t.luggageCount} volume(s)',
+                  ),
+                ],
+              ),
             ],
 
             if (t.observations != null && t.observations!.isNotEmpty) ...[
               const SizedBox(height: 12),
-              _SectionCard(children: [
-                _DetailRow(
-                  icon: Icons.notes,
-                  label: 'Observações',
-                  value: t.observations!,
-                ),
-              ]),
+              _SectionCard(
+                children: [
+                  _DetailRow(
+                    icon: Icons.notes,
+                    label: 'Observações',
+                    value: t.observations!,
+                  ),
+                ],
+              ),
             ],
           ],
         ),
@@ -275,12 +298,12 @@ class _TripHistoryDetailPageState extends State<TripHistoryDetailPage> {
   }
 
   IconData _paymentIcon(String method) => switch (method) {
-        'pix' => Icons.pix_rounded,
-        'debit' => Icons.credit_card,
-        'credit' => Icons.credit_card,
-        'cash' => Icons.money,
-        _ => Icons.payment,
-      };
+    'pix' => Icons.account_balance_rounded,
+    'debit' => Icons.credit_card,
+    'credit' => Icons.credit_card,
+    'cash' => Icons.money,
+    _ => Icons.payment,
+  };
 
   void _fitMap(KzMapController c, LatLng o, LatLng d) {
     c.fitBounds(
@@ -309,7 +332,9 @@ class _SectionCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(14)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
       child: Column(children: children),
     );
   }
@@ -339,7 +364,10 @@ class _DetailRow extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             '$label: ',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
           ),
           Expanded(
             child: Text(

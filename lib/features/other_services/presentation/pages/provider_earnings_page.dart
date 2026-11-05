@@ -6,6 +6,7 @@ import 'package:kz_servicos_prestador/core/services/provider_service.dart';
 import 'package:kz_servicos_prestador/core/services/trip_service.dart';
 import 'package:kz_servicos_prestador/core/widgets/service_provider_bottom_nav.dart';
 import 'package:kz_servicos_prestador/features/earnings/presentation/widgets/earnings_chart_card.dart';
+import 'package:kz_servicos_prestador/core/utils/kz_format.dart';
 
 class ProviderEarningsPage extends StatefulWidget {
   final ValueChanged<int> onNavTap;
@@ -134,7 +135,7 @@ class _BalanceCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'R\$ ${earnings.availableBalance.toStringAsFixed(2)}',
+            formatKz(earnings.availableBalance),
             style: const TextStyle(
               fontFamily: 'OutfitBlack',
               fontSize: 32,
@@ -174,7 +175,7 @@ class _TotalReceivedCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'R\$ ${earnings.totalReceived.toStringAsFixed(2)}',
+            formatKz(earnings.totalReceived),
             style: const TextStyle(
               fontFamily: 'OutfitBlack',
               fontSize: 28,
@@ -185,7 +186,9 @@ class _TotalReceivedCard extends StatelessWidget {
           Text(
             '${earnings.totalTrips} serviços no total',
             style: const TextStyle(
-                fontSize: 13, color: AppColors.textSecondary),
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -216,8 +219,11 @@ class _BankInfoCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.account_balance,
-                  color: AppColors.textSecondary, size: 20),
+              const Icon(
+                Icons.account_balance,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               const Text(
                 'Dados bancários',
@@ -241,13 +247,17 @@ class _BankInfoCard extends StatelessWidget {
           Text(
             '$bank · Ag $agency · Cc $account',
             style: const TextStyle(
-                fontSize: 13, color: AppColors.textSecondary),
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
-            'PIX: $pix',
+            'IBAN: $pix',
             style: const TextStyle(
-                fontSize: 13, color: AppColors.textSecondary),
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -280,8 +290,7 @@ class _StatementSection extends StatelessWidget {
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Text(
                 'Nenhuma transação encontrada',
-                style: TextStyle(
-                    color: AppColors.textSecondary, fontSize: 14),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
             ),
           )
@@ -298,22 +307,23 @@ class _EntryTile extends StatelessWidget {
   const _EntryTile({required this.entry});
 
   IconData get _icon => switch (entry.type) {
-        EarningType.trip => Icons.handyman_rounded,
-        EarningType.bonus => Icons.star,
-        EarningType.withdrawal => Icons.arrow_downward,
-      };
+    EarningType.trip => Icons.handyman_rounded,
+    EarningType.bonus => Icons.star,
+    EarningType.withdrawal => Icons.arrow_downward,
+  };
 
   Color get _color => switch (entry.type) {
-        EarningType.trip => const Color(0xFF2ECC71),
-        EarningType.bonus => AppColors.highlight,
-        EarningType.withdrawal => Colors.red,
-      };
+    EarningType.trip => const Color(0xFF2ECC71),
+    EarningType.bonus => AppColors.highlight,
+    EarningType.withdrawal => Colors.red,
+  };
 
   @override
   Widget build(BuildContext context) {
     final isNegative = entry.type == EarningType.withdrawal;
-    final statusColor =
-        entry.isPaid ? const Color(0xFF2ECC71) : Colors.orange.shade600;
+    final statusColor = entry.isPaid
+        ? const Color(0xFF2ECC71)
+        : Colors.orange.shade600;
     final statusLabel = entry.isPaid ? 'Pago' : 'Não pago';
 
     return Container(
@@ -360,7 +370,9 @@ class _EntryTile extends StatelessWidget {
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
@@ -380,7 +392,7 @@ class _EntryTile extends StatelessWidget {
             ),
           ),
           Text(
-            '${isNegative ? '-' : '+'}R\$ ${entry.amount.toStringAsFixed(2)}',
+            '${isNegative ? '-' : '+'}${formatKz(entry.amount)}',
             style: TextStyle(
               fontFamily: 'OutfitBlack',
               fontSize: 15,

@@ -6,11 +6,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
+import 'package:kz_servicos_prestador/core/constants/feature_flags.dart';
 import 'package:kz_servicos_prestador/core/models/driver_profile_data.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/driver_service.dart';
 import 'package:kz_servicos_prestador/core/widgets/provider_bottom_nav.dart';
 import 'package:kz_servicos_prestador/routes/app_router.dart';
+import 'package:kz_servicos_prestador/core/constants/support_contact.dart';
 
 class ProfilePage extends StatefulWidget {
   final ValueChanged<int> onNavTap;
@@ -58,7 +60,7 @@ class _ProfilePageState extends State<ProfilePage> {
           children: [
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Câmera'),
+              title: const Text('Câmara'),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             ListTile(
@@ -115,7 +117,7 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Erro ao salvar foto. Tente novamente.'),
+            content: Text('Erro ao guardar foto. Tente novamente.'),
           ),
         );
       }
@@ -129,7 +131,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (vehicleId == null || vehicleId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Cadastre um veículo antes de enviar foto.'),
+          content: Text('Registe um veículo antes de enviar foto.'),
         ),
       );
       return;
@@ -142,7 +144,7 @@ class _ProfilePageState extends State<ProfilePage> {
           children: [
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Câmera'),
+              title: const Text('Câmara'),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             ListTile(
@@ -193,7 +195,7 @@ class _ProfilePageState extends State<ProfilePage> {
       debugPrint('[KZ] vehicle photo upload erro: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao salvar foto do carro.')),
+          const SnackBar(content: Text('Erro ao guardar foto do carro.')),
         );
       }
     } finally {
@@ -217,7 +219,7 @@ class _ProfilePageState extends State<ProfilePage> {
           children: [
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Câmera'),
+              title: const Text('Câmara'),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             ListTile(
@@ -267,7 +269,7 @@ class _ProfilePageState extends State<ProfilePage> {
       debugPrint('[KZ] driver photo upload erro: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao salvar foto do motorista.')),
+          const SnackBar(content: Text('Erro ao guardar foto do motorista.')),
         );
       }
     } finally {
@@ -294,9 +296,14 @@ class _ProfilePageState extends State<ProfilePage> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Ative a localização em segundo plano'),
-            content: const Text('Para aparecer como motorista próximo mesmo com o aplicativo em segundo plano, permita a localização precisa e escolha “Sempre” nas configurações do aplicativo.'),
+            content: const Text(
+              'Para aparecer como motorista próximo mesmo com o aplicativo em segundo plano, permita a localização precisa e escolha “Sempre” nas configurações do aplicativo.',
+            ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Agora não')),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Agora não'),
+              ),
               ElevatedButton(
                 onPressed: () async {
                   Navigator.pop(context);
@@ -356,9 +363,9 @@ class _ProfilePageState extends State<ProfilePage> {
         const SnackBar(content: Text('Erro ao remover foto do carro.')),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Foto do carro removida.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Foto do carro removida.')));
       await _load();
     }
     if (mounted) setState(() => _deletingPhotoId = null);
@@ -437,7 +444,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                             _InfoRow(
                               icon: Icons.pin,
-                              label: 'Placa',
+                              label: 'Matrícula',
                               value: _profile?.vehicle?.licensePlate ?? '-',
                             ),
                             _InfoRow(
@@ -453,7 +460,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             _ActionRow(
                               icon: Icons.add_a_photo_outlined,
                               label: _isUploadingVehiclePhoto
-                                  ? 'Enviando foto...'
+                                  ? 'A enviar foto...'
                                   : 'Adicionar foto do carro',
                               onTap: _isUploadingVehiclePhoto
                                   ? null
@@ -471,7 +478,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             _ActionRow(
                               icon: Icons.add_photo_alternate_outlined,
                               label: _isUploadingDriverPhoto
-                                  ? 'Enviando foto...'
+                                  ? 'A enviar foto...'
                                   : 'Adicionar foto ao perfil público',
                               onTap: _isUploadingDriverPhoto
                                   ? null
@@ -488,7 +495,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           _buildSection('Documentos', [
                             _InfoRow(
                               icon: Icons.credit_card,
-                              label: 'CNH',
+                              label: 'Carta de condução',
                               value: _profile?.cnhNumber ?? '-',
                             ),
                             _InfoRow(
@@ -647,7 +654,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 2),
                 const Text(
-                  'Controle sua disponibilidade para receber corridas.',
+                  'Controle a sua disponibilidade para receber viagens.',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -743,26 +750,25 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 20),
               _HelpContactRow(
                 icon: Icons.phone_outlined,
-                label: 'Telefone',
-                value: '(11) 99999-0000',
-                onTap: () => launchUrl(Uri.parse('tel:+5511999990000')),
+                label: 'Telemóvel',
+                value: SupportContact.phoneDisplay,
+                onTap: () => launchUrl(SupportContact.telUri),
               ),
               const Divider(height: 24),
               _HelpContactRow(
                 icon: Icons.email_outlined,
                 label: 'E-mail',
-                value: 'contato@kzservicos.com.br',
-                onTap: () =>
-                    launchUrl(Uri.parse('mailto:contato@kzservicos.com.br')),
+                value: SupportContact.email,
+                onTap: () => launchUrl(SupportContact.mailtoUri),
               ),
               const Divider(height: 24),
               _HelpContactRow(
                 icon: Icons.chat_outlined,
                 label: 'WhatsApp',
-                value: 'Fale conosco',
+                value: 'Fale connosco',
                 iconColor: const Color(0xFF25D366),
                 onTap: () => launchUrl(
-                  Uri.parse('https://wa.me/5511999990000'),
+                  SupportContact.whatsappUri,
                   mode: LaunchMode.externalApplication,
                 ),
               ),
@@ -779,11 +785,11 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text(
-          'Sair da conta',
+          'Terminar sessão',
           style: TextStyle(fontFamily: 'OutfitBlack', fontSize: 18),
         ),
         content: const Text(
-          'Tem certeza que deseja sair da sua conta?',
+          'Tem a certeza de que pretende terminar sessão?',
           style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
         ),
         actions: [
@@ -800,7 +806,7 @@ class _ProfilePageState extends State<ProfilePage> {
               AppRouter.logout(context);
             },
             child: Text(
-              'Sair',
+              'Terminar sessão',
               style: TextStyle(
                 color: Colors.red.shade400,
                 fontWeight: FontWeight.w600,
@@ -827,14 +833,16 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           _MenuItem(
             icon: Icons.history_rounded,
-            label: 'Histórico de corridas',
+            label: 'Histórico de viagens',
             onTap: () => context.push('/trip-history'),
           ),
-          _MenuItem(
-            icon: Icons.card_giftcard_rounded,
-            label: 'Clube de benefícios',
-            onTap: () => context.push('/benefits'),
-          ),
+          // Clube de benefícios desativado (ver FeatureFlags).
+          if (FeatureFlags.benefitsClubEnabled)
+            _MenuItem(
+              icon: Icons.card_giftcard_rounded,
+              label: 'Clube de benefícios',
+              onTap: () => context.push('/benefits'),
+            ),
           _MenuItem(
             icon: Icons.security_outlined,
             label: 'Segurança',
@@ -847,7 +855,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           _MenuItem(
             icon: Icons.logout,
-            label: 'Sair',
+            label: 'Terminar sessão',
             color: Colors.red.shade400,
             onTap: () => _showLogoutDialog(context),
             showDivider: false,

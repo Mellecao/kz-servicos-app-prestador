@@ -11,10 +11,10 @@ void main() {
         'destination_address': 'Aeroporto Congonhas',
       });
 
-      expect(content?.title, 'Nova corrida disponível!');
+      expect(content?.title, 'Nova viagem disponível!');
       expect(
         content?.body,
-        'Maria solicitou uma corrida de Av. Paulista, 1000 para Aeroporto Congonhas.',
+        'Maria solicitou uma viagem de Av. Paulista, 1000 para Aeroporto Congonhas.',
       );
     });
 
@@ -27,7 +27,7 @@ void main() {
       expect(content?.title, 'Passageiro confirmou!');
       expect(
         content?.body,
-        'João confirmou a corrida. Toque para confirmar sua participação.',
+        'João confirmou a viagem. Toque para confirmar a sua participação.',
       );
     });
 
@@ -40,7 +40,7 @@ void main() {
       expect(content?.title, 'Passageiro confirmou!');
       expect(
         content?.body,
-        'João confirmou a corrida. Toque para confirmar sua participação.',
+        'João confirmou a viagem. Toque para confirmar a sua participação.',
       );
     });
 
@@ -50,10 +50,10 @@ void main() {
         'client_name': 'Maria',
       });
 
-      expect(content?.title, 'Nova solicitação de corrida!');
+      expect(content?.title, 'Nova solicitação de viagem!');
       expect(
         content?.body,
-        'Maria escolheu você para uma viagem. Informe o seu valor.',
+        'Maria escolheu o seu perfil para uma viagem. Indique o seu valor.',
       );
     });
 
@@ -92,7 +92,7 @@ void main() {
         'message': 'Recebemos sua solicitação e vamos verificar.',
       });
 
-      expect(content?.title, 'Nova mensagem da KZ');
+      expect(content?.title, 'Nova mensagem do suporte');
       expect(content?.body, 'Recebemos sua solicitação e vamos verificar.');
     });
   });

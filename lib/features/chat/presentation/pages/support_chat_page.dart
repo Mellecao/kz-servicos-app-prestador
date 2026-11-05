@@ -94,7 +94,7 @@ class _SupportChatPageState extends State<SupportChatPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Não foi possível abrir o chat com a KZ.';
+        _error = 'Não foi possível abrir o chat com o suporte.';
       });
     }
   }
@@ -171,7 +171,7 @@ class _SupportChatPageState extends State<SupportChatPage> {
               radius: 17,
               backgroundColor: AppColors.secondary,
               child: Text(
-                'KZ',
+                'Suporte',
                 style: TextStyle(
                   color: Colors.white,
                   fontFamily: 'OutfitBlack',
@@ -184,7 +184,7 @@ class _SupportChatPageState extends State<SupportChatPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Chat com a KZ',
+                  'Chat com o suporte',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontFamily: 'OutfitBlack',

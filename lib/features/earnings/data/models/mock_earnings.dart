@@ -57,8 +57,7 @@ class MockEarnings {
 
   double get monthOverMonthChange {
     if (previousMonthTotal == 0) return 100;
-    return ((currentMonthTotal - previousMonthTotal) /
-            previousMonthTotal) *
+    return ((currentMonthTotal - previousMonthTotal) / previousMonthTotal) *
         100;
   }
 
@@ -92,21 +91,21 @@ class MockEarnings {
     recentEntries: [
       MockEarningEntry(
         id: 'earn_1',
-        description: 'Corrida #312 - Ana Carolina',
+        description: 'Viagem #312 - Ana Carolina',
         amount: 32.50,
         date: DateTime(2026, 4, 14, 18, 45),
         type: EarningType.trip,
       ),
       MockEarningEntry(
         id: 'earn_2',
-        description: 'Corrida #311 - Pedro Alves',
+        description: 'Viagem #311 - Pedro Alves',
         amount: 28.00,
         date: DateTime(2026, 4, 14, 14, 20),
         type: EarningType.trip,
       ),
       MockEarningEntry(
         id: 'earn_3',
-        description: 'Corrida #310 - Lucia Santos',
+        description: 'Viagem #310 - Lucia Santos',
         amount: 55.00,
         date: DateTime(2026, 4, 13, 6, 30),
         type: EarningType.trip,

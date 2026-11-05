@@ -3,18 +3,21 @@ import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 import 'package:kz_servicos_prestador/core/services/scheduled_trips_service.dart';
 
 TripData makeTrip(String id, DateTime scheduledAt) => TripData(
-      tripId: id,
-      candidateId: '',
-      clientName: 'Cliente',
-      origin: 'A',
-      destination: 'B',
-      originLat: 0, originLng: 0, destinationLat: 0, destinationLng: 0,
-      scheduledAt: scheduledAt,
-      passengerCount: 1,
-      childrenCount: 0,
-      luggageCount: 0,
-      status: 'scheduled',
-    );
+  tripId: id,
+  candidateId: '',
+  clientName: 'Cliente',
+  origin: 'A',
+  destination: 'B',
+  originLat: 0,
+  originLng: 0,
+  destinationLat: 0,
+  destinationLng: 0,
+  scheduledAt: scheduledAt,
+  passengerCount: 1,
+  childrenCount: 0,
+  luggageCount: 0,
+  status: 'scheduled',
+);
 
 void main() {
   group('ScheduledTripsService.mergeAndSort', () {

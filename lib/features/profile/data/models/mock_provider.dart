@@ -58,15 +58,14 @@ class MockProvider {
   });
 
   bool get isDriver => providerType == ProviderType.driver;
-  bool get isServiceProvider =>
-      providerType == ProviderType.serviceProvider;
+  bool get isServiceProvider => providerType == ProviderType.serviceProvider;
 
   static final MockProvider driverSample = MockProvider(
     id: 'provider_1',
     name: 'João Silva',
     email: 'joao.silva@email.com',
-    phone: '(11) 98765-4321',
-    cpf: '***.***.***-90',
+    phone: '+244 923 456 789',
+    cpf: 'BI *****90',
     cnhNumber: '01234567890',
     cnhExpiry: '15/08/2028',
     cnhCategory: 'B',
@@ -92,8 +91,8 @@ class MockProvider {
     id: 'provider_2',
     name: 'Maria Fernanda Santos',
     email: 'maria.santos@email.com',
-    phone: '(11) 97654-3210',
-    cpf: '***.***.***-45',
+    phone: '+244 924 567 890',
+    cpf: 'BI *****45',
     rating: 4.7,
     completedTrips: 89,
     profileCompletion: 0.88,
@@ -106,7 +105,7 @@ class MockProvider {
     pixKey: 'maria.santos@email.com',
     providerType: ProviderType.serviceProvider,
     password: '654321',
-    serviceCategories: ['Eletricista', 'Encanador'],
+    serviceCategories: ['Eletricista', 'Canalizador'],
   );
 
   static final MockProvider sample = driverSample;

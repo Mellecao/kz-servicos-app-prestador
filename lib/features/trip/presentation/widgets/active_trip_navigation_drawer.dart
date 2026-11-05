@@ -40,7 +40,7 @@ class ActiveTripNavigationDrawer extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   const Text(
-                    'Corrida em andamento',
+                    'Viagem em curso',
                     style: TextStyle(
                       fontFamily: 'OutfitBlack',
                       fontSize: 18,
@@ -98,7 +98,7 @@ class ActiveTripNavigationDrawer extends StatelessWidget {
                   ),
                   _DrawerItem(
                     icon: Icons.history_outlined,
-                    label: 'Histórico de corridas',
+                    label: 'Histórico de viagens',
                     route: '/trip-history',
                     onSelectRoute: onSelectRoute,
                   ),
@@ -112,7 +112,7 @@ class ActiveTripNavigationDrawer extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.directions_car_outlined, size: 18),
-                  label: const Text('Voltar para corrida'),
+                  label: const Text('Voltar à viagem'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.textPrimary,
                     side: BorderSide(color: Colors.grey.shade300),

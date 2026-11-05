@@ -79,7 +79,8 @@ class RoutePulseAnimator {
     const r = 6371000.0;
     final dLat = _toRad(b.latitude - a.latitude);
     final dLon = _toRad(b.longitude - a.longitude);
-    final hav = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final hav =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(_toRad(a.latitude)) *
             math.cos(_toRad(b.latitude)) *
             math.sin(dLon / 2) *

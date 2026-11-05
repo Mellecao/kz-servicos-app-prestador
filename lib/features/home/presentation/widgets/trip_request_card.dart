@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:kz_servicos_prestador/core/constants/app_brand.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/models/trip_data.dart';
 
@@ -238,11 +239,37 @@ class _TripRequestCardState extends State<TripRequestCard>
                 if (widget.request.hasChildren)
                   _InfoChip(
                     icon: Icons.child_care,
-                    label: '${widget.request.childrenCount} criança(s)',
+                    label: '${widget.request.displayChildrenCount} criança(s)',
                   ),
                 if (widget.request.hasLuggage)
                   _InfoChip(icon: Icons.luggage, label: 'Com mala'),
               ],
+            ),
+          ],
+
+          if (widget.request.passengerLabels.isNotEmpty) ...[
+            SizedBox(height: isCompact ? 8 : 10),
+            _DetailList(
+              icon: Icons.people_outline_rounded,
+              title: 'Passageiros',
+              entries: widget.request.passengerLabels,
+            ),
+          ],
+          if (widget.request.childLabels.isNotEmpty) ...[
+            SizedBox(height: isCompact ? 8 : 10),
+            _DetailList(
+              icon: Icons.warning_amber_rounded,
+              title: 'Crianças',
+              entries: widget.request.childLabels,
+              warning: true,
+            ),
+          ],
+          if (widget.request.luggageLabels.isNotEmpty) ...[
+            SizedBox(height: isCompact ? 8 : 10),
+            _DetailList(
+              icon: Icons.luggage_outlined,
+              title: 'Bagagem',
+              entries: widget.request.luggageLabels,
             ),
           ],
 
@@ -294,7 +321,7 @@ class _TripRequestCardState extends State<TripRequestCard>
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'O passageiro confirmou a corrida. Confira os detalhes e confirme se ainda quer manter o agendamento.',
+                      'O passageiro confirmou a viagem. Verifique os detalhes e confirme se ainda pretende manter o agendamento.',
                       style: TextStyle(
                         fontFamily: 'QuasimodoSemiBold',
                         fontSize: 13,
@@ -326,7 +353,7 @@ class _TripRequestCardState extends State<TripRequestCard>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Seu valor para esta corrida:',
+                    'O seu valor para esta viagem:',
                     style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
@@ -399,7 +426,7 @@ class _TripRequestCardState extends State<TripRequestCard>
                   if (hasKzProposal) ...[
                     const SizedBox(height: 4),
                     const Text(
-                      'proposta feita pela KZ',
+                      'proposta feita pela ${AppBrand.name}',
                       style: TextStyle(
                         fontSize: 12,
                         color: Color(0xFF16A34A),
@@ -564,6 +591,63 @@ class _InfoChip extends StatelessWidget {
             style: const TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailList extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final List<String> entries;
+  final bool warning;
+
+  const _DetailList({
+    required this.icon,
+    required this.title,
+    required this.entries,
+    this.warning = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = warning ? const Color(0xFFB45309) : AppColors.textSecondary;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: warning ? const Color(0xFFFFF7ED) : AppColors.background,
+        borderRadius: BorderRadius.circular(10),
+        border: warning ? Border.all(color: AppColors.highlight) : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'QuasimodoSemiBold',
+                    fontSize: 12,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                ...entries.map(
+                  (entry) => Text(
+                    entry,
+                    style: TextStyle(fontSize: 12, color: color, height: 1.3),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

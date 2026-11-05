@@ -30,17 +30,14 @@ class _PriceOfferDialogState extends State<PriceOfferDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Proponha o valor da corrida'),
+      title: const Text('Proponha o valor da viagem'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: _controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              prefixText: 'R\$ ',
-              errorText: _error,
-            ),
+            decoration: InputDecoration(prefixText: 'R\$ ', errorText: _error),
             autofocus: true,
           ),
         ],
@@ -50,10 +47,7 @@ class _PriceOfferDialogState extends State<PriceOfferDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancelar'),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('Enviar proposta'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('Enviar proposta')),
       ],
     );
   }

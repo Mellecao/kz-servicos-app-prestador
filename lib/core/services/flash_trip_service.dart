@@ -25,10 +25,7 @@ class FlashTripService {
   }
 
   Future<void> rejectCall(String tripId) async {
-    await client.rpc(
-      'reject_flash_call',
-      params: {'p_trip_id': tripId},
-    );
+    await client.rpc('reject_flash_call', params: {'p_trip_id': tripId});
   }
 
   Future<void> recheckConfirm(String tripId) async {

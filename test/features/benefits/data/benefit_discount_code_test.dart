@@ -5,12 +5,12 @@ void main() {
   test('gera codigo promocional sequencial legivel', () {
     final code = BenefitDiscountCode.buildCode(sequenceNumber: 42);
 
-    expect(code, 'KZBEN-000042');
+    expect(code, 'SSBEN-000042');
   });
 
   test('gera codigo promocional aleatorio legivel', () {
     final code = BenefitDiscountCode.buildRandomCode();
 
-    expect(code, matches(RegExp(r'^KZ-[A-Z2-9]{6}$')));
+    expect(code, matches(RegExp(r'^SS-[A-Z2-9]{6}$')));
   });
 }

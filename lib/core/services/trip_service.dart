@@ -7,18 +7,23 @@ const _tripSelect =
     '*, pickup_address:addresses!pickup_address_id(formatted_address,latitude,longitude), '
     'dropoff_address:addresses!dropoff_address_id(formatted_address,latitude,longitude), '
     'client:users!client_id(full_name,phone,avatar_url), '
+    'trip_passengers(name,age,needs_car_seat,sort_order), '
+    'trip_luggage(type,size,weight_kg,quantity,sort_order), '
     'trip_stops(*, addresses(*))';
 
 const _tripDetailSelect =
     '*, pickup_address:addresses!pickup_address_id(formatted_address,latitude,longitude), '
     'dropoff_address:addresses!dropoff_address_id(formatted_address,latitude,longitude), '
     'client:users!client_id(full_name,phone,avatar_url), '
-    'trip_children(*), trip_luggage(*), trip_stops(*, addresses(*))';
+    'trip_passengers(name,age,needs_car_seat,sort_order), trip_children(*), '
+    'trip_luggage(type,size,weight_kg,quantity,sort_order), trip_stops(*, addresses(*))';
 
 const _tripHistorySelect =
     '*, pickup_address:addresses!pickup_address_id(formatted_address,latitude,longitude), '
     'dropoff_address:addresses!dropoff_address_id(formatted_address,latitude,longitude), '
     'client:users!client_id(full_name,avatar_url), '
+    'trip_passengers(name,age,needs_car_seat,sort_order), '
+    'trip_luggage(type,size,weight_kg,quantity,sort_order), '
     'ratings(score)';
 
 const _activeTripSelect =
@@ -125,7 +130,7 @@ class TripService {
             : DateTime.tryParse(trip!['scheduled_datetime'].toString());
         if (scheduled == null || !scheduled.isAfter(DateTime.now())) {
           debugPrint(
-            '[TripService] convite imediato bloqueado durante corrida ativa',
+            '[TripService] convite imediato bloqueado durante viagem ativa',
           );
           return false;
         }
@@ -639,7 +644,7 @@ class EarningsData {
           : DateTime.now();
       return EarningEntry(
         id: t['id'] as String? ?? '',
-        description: 'Corrida',
+        description: 'Viagem',
         amount: price,
         date: date,
         type: EarningType.trip,

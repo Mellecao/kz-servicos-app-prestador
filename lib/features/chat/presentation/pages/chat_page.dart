@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kz_servicos_prestador/core/constants/app_brand.dart';
 import 'package:kz_servicos_prestador/core/constants/app_colors.dart';
 import 'package:kz_servicos_prestador/core/services/auth_state.dart';
 import 'package:kz_servicos_prestador/core/services/trip_chat_service.dart';
@@ -27,7 +28,7 @@ class _ChatPageState extends State<ChatPage> {
   static const _presets = [
     'Estou a caminho',
     'Cheguei ao local',
-    'Aguardando passageiro',
+    'A aguardar passageiro',
     'Trânsito intenso',
     'Preciso de ajuda',
   ];
@@ -76,7 +77,9 @@ class _ChatPageState extends State<ChatPage> {
   void _handleRemoteCancellation() {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Esta corrida foi cancelada pela KZ.')),
+      const SnackBar(
+        content: Text('Esta viagem foi cancelada pela ${AppBrand.name}.'),
+      ),
     );
     context.go('/home');
   }
@@ -291,7 +294,7 @@ class _ChatPageState extends State<ChatPage> {
                   child: TextField(
                     controller: _controller,
                     decoration: InputDecoration(
-                      hintText: 'Digite sua mensagem...',
+                      hintText: 'Escreva a sua mensagem...',
                       hintStyle: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 14,
@@ -389,7 +392,7 @@ class _TripDetailsHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  args.title.isNotEmpty ? args.title : 'Corrida',
+                  args.title.isNotEmpty ? args.title : 'Viagem',
                   style: const TextStyle(
                     fontFamily: 'OutfitBlack',
                     fontSize: 13,

@@ -15,9 +15,7 @@ class WeekCalendar extends StatelessWidget {
     required this.onCalendarTapped,
   });
 
-  static const _dayNames = [
-    'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom',
-  ];
+  static const _dayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
   List<DateTime> get _weekDays {
     final base = selectedDate ?? DateTime.now();
@@ -31,8 +29,7 @@ class WeekCalendar extends StatelessWidget {
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  bool _hasTripOnDay(DateTime day) =>
-      tripDates.any((d) => _isSameDay(d, day));
+  bool _hasTripOnDay(DateTime day) => tripDates.any((d) => _isSameDay(d, day));
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +77,9 @@ class WeekCalendar extends StatelessWidget {
                                 : Colors.transparent,
                             border: isToday && !isSelected
                                 ? Border.all(
-                                    color: AppColors.highlight, width: 1.5)
+                                    color: AppColors.highlight,
+                                    width: 1.5,
+                                  )
                                 : null,
                           ),
                           alignment: Alignment.center,

@@ -40,9 +40,7 @@ class _FlashIncomingCallPageState extends State<FlashIncomingCallPage> {
       return Scaffold(body: Center(child: Text(error!)));
     }
     if (trip == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final pickup = (trip!['pickup'] as Map?) ?? const {};
@@ -51,7 +49,7 @@ class _FlashIncomingCallPageState extends State<FlashIncomingCallPage> {
     final obs = trip!['observations'] as String?;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('⚡ Corrida Flash')),
+      appBar: AppBar(title: const Text('⚡ Viagem Flash')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -71,9 +69,7 @@ class _FlashIncomingCallPageState extends State<FlashIncomingCallPage> {
             Text('Obs: $obs'),
           ],
           const SizedBox(height: 24),
-          FlashPriceInput(
-            onSubmit: (price) => _handleSubmit(price),
-          ),
+          FlashPriceInput(onSubmit: (price) => _handleSubmit(price)),
           const SizedBox(height: 8),
           TextButton(
             onPressed: submitting ? null : _handleReject,

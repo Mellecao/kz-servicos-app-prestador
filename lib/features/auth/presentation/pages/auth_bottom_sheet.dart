@@ -121,14 +121,14 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
 
   String get _title => switch (_mode) {
     AuthMode.login => 'Login',
-    AuthMode.forgotPassword => 'Recuperar senha',
+    AuthMode.forgotPassword => 'Recuperar palavra-passe',
     _ => 'Login',
   };
 
   String get _subtitle => switch (_mode) {
-    AuthMode.login => 'Acesse sua conta como prestador',
-    AuthMode.forgotPassword => 'Informe seu e-mail',
-    _ => 'Acesse sua conta',
+    AuthMode.login => 'Aceda à sua conta como prestador',
+    AuthMode.forgotPassword => 'Indique o seu e-mail',
+    _ => 'Aceda à sua conta',
   };
 
   String get _primaryLabel => switch (_mode) {
@@ -204,8 +204,11 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
                 TextField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  decoration: _inputDecoration('Senha', Icons.lock_outlined)
-                      .copyWith(
+                  decoration:
+                      _inputDecoration(
+                        'Palavra-passe',
+                        Icons.lock_outlined,
+                      ).copyWith(
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword
@@ -240,7 +243,7 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
                     onTap: () =>
                         setState(() => _mode = AuthMode.forgotPassword),
                     child: const Text(
-                      'Esqueceu a senha?',
+                      'Esqueceu-se da palavra-passe?',
                       style: TextStyle(
                         fontFamily: 'QuasimodoSemiBold',
                         fontSize: 13,
@@ -258,7 +261,7 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
                   onPressed: _isLoading ? null : _submit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.highlight,
-                    foregroundColor: Colors.black87,
+                    foregroundColor: AppColors.onHighlight,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),

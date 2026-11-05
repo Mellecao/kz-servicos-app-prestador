@@ -1,4 +1,7 @@
-import 'package:kz_servicos_prestador/core/utils/brazil_time.dart';
+import 'package:kz_servicos_prestador/core/constants/app_brand.dart';
+import 'package:kz_servicos_prestador/core/utils/angola_time.dart';
+import 'package:kz_servicos_prestador/core/utils/payment_labels.dart';
+import 'package:kz_servicos_prestador/core/constants/app_geo.dart';
 
 class TripData {
   final String tripId;
@@ -32,6 +35,7 @@ class TripData {
   final String status;
   final DateTime? finishedAt;
   final double? rating;
+  final List<TripPassenger> passengers;
   final List<TripChild> children;
   final List<TripLuggage> luggage;
   final List<TripStopData> stops;
@@ -69,6 +73,7 @@ class TripData {
     required this.status,
     this.finishedAt,
     this.rating,
+    this.passengers = const [],
     this.children = const [],
     this.luggage = const [],
     this.stops = const [],
@@ -88,8 +93,44 @@ class TripData {
   double get price =>
       finalPrice ?? offeredPrice ?? kzProposedPrice ?? estimatedPrice ?? 0;
 
-  bool get hasChildren => childrenCount > 0;
-  bool get hasLuggage => luggageCount > 0;
+  bool get hasChildren =>
+      childrenCount > 0 ||
+      children.isNotEmpty ||
+      passengers.any((passenger) => passenger.isChild);
+  bool get hasLuggage => luggageCount > 0 || luggage.isNotEmpty;
+  int get regularPassengerCount => passengers.isEmpty
+      ? passengerCount
+      : passengers.where((passenger) => !passenger.isChild).length;
+  int get displayChildrenCount {
+    final passengerChildren = passengers
+        .where((passenger) => passenger.isChild)
+        .length;
+    if (passengerChildren > 0) return passengerChildren;
+    if (children.isNotEmpty) return children.length;
+    return childrenCount;
+  }
+
+  List<String> get passengerLabels => passengers
+      .where((passenger) => !passenger.isChild)
+      .map((passenger) => passenger.detailLabel)
+      .toList();
+  List<String> get childLabels {
+    final passengerChildren = passengers
+        .where((passenger) => passenger.isChild)
+        .map((passenger) => passenger.detailLabel)
+        .toList();
+    if (passengerChildren.isNotEmpty) return passengerChildren;
+    return children
+        .map(
+          (child) =>
+              'Criança — ${child.age} anos${child.needsCarSeat ? ' (levar cadeirinha)' : ''}',
+        )
+        .toList();
+  }
+
+  List<String> get childWarnings => childLabels;
+  List<String> get luggageLabels =>
+      luggage.map((item) => item.detailLabel).toList();
 
   bool get isAwaitingKzApproval =>
       status == 'searching_drivers' && candidateStatus == 'accepted';
@@ -129,6 +170,7 @@ class TripData {
     String? status,
     DateTime? finishedAt,
     double? rating,
+    List<TripPassenger>? passengers,
     List<TripChild>? children,
     List<TripLuggage>? luggage,
     List<TripStopData>? stops,
@@ -166,6 +208,7 @@ class TripData {
       status: status ?? this.status,
       finishedAt: finishedAt ?? this.finishedAt,
       rating: rating ?? this.rating,
+      passengers: passengers ?? this.passengers,
       children: children ?? this.children,
       luggage: luggage ?? this.luggage,
       stops: stops ?? this.stops,
@@ -174,39 +217,44 @@ class TripData {
   }
 
   String get statusLabel {
-    if (isAwaitingKzApproval) return 'Aguardando aprovação da KZ';
-    if (isScheduledDirectRequest) return 'Aguardando proposta do motorista';
+    if (isAwaitingKzApproval) return 'A aguardar aprovação da ${AppBrand.name}';
+    if (isScheduledDirectRequest) return 'A aguardar proposta do motorista';
     return switch (status) {
       'open' => 'Aberta',
       'under_review' => 'Em análise',
-      'searching_drivers' => 'Buscando motoristas',
-      'awaiting_driver_confirmation' => 'Aguardando re-check do motorista',
-      'awaiting_client_confirmation' => 'Aguardando passageiro aceitar',
+      'searching_drivers' => 'À procura de motoristas',
+      'awaiting_driver_confirmation' => 'A aguardar re-check do motorista',
+      'awaiting_client_confirmation' => 'A aguardar que o passageiro aceite',
       'scheduled' => 'Agendada',
-      'started' => 'Em andamento',
+      'started' => 'Em curso',
       'finished' => 'Finalizado',
       'cancelled' => 'Cancelado',
       _ => status,
     };
   }
 
-  String get paymentMethodLabel => switch (paymentMethod) {
-    'pix' => 'PIX',
-    'debit' => 'Débito',
-    'credit' => 'Crédito',
-    'cash' => 'Dinheiro',
-    'billing' => 'Faturamento',
-    _ => paymentMethod ?? '-',
-  };
+  String get paymentMethodLabel => labelForPaymentMethod(paymentMethod);
 
   factory TripData.fromMap(Map<String, dynamic> map) {
     final pickup = map['pickup_address'] as Map<String, dynamic>? ?? {};
     final dropoff = map['dropoff_address'] as Map<String, dynamic>? ?? {};
     final clientMap = map['client'] as Map<String, dynamic>? ?? {};
 
+    final rawPassengers = map['trip_passengers'];
     final rawChildren = map['trip_children'];
     final rawLuggage = map['trip_luggage'];
     final rawStops = map['trip_stops'];
+
+    final passengers = rawPassengers is List
+        ? (rawPassengers
+              .whereType<Map>()
+              .map(
+                (entry) =>
+                    TripPassenger.fromMap(Map<String, dynamic>.from(entry)),
+              )
+              .toList()
+            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)))
+        : <TripPassenger>[];
 
     final children = rawChildren is List
         ? rawChildren
@@ -215,9 +263,10 @@ class TripData {
         : <TripChild>[];
 
     final luggage = rawLuggage is List
-        ? rawLuggage
+        ? (rawLuggage
               .map((e) => TripLuggage.fromMap(e as Map<String, dynamic>))
               .toList()
+            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)))
         : <TripLuggage>[];
     final stops = rawStops is List
         ? (rawStops
@@ -240,8 +289,7 @@ class TripData {
     // `candidate_status`.
     final rawTripDriverCandidates = map['trip_driver_candidates'];
     String? embeddedCandidateStatus;
-    if (rawTripDriverCandidates is List &&
-        rawTripDriverCandidates.isNotEmpty) {
+    if (rawTripDriverCandidates is List && rawTripDriverCandidates.isNotEmpty) {
       final first = rawTripDriverCandidates.first;
       if (first is Map) embeddedCandidateStatus = first['status'] as String?;
     }
@@ -257,14 +305,18 @@ class TripData {
       clientAvatarUrl: clientMap['avatar_url'] as String?,
       origin: pickup['formatted_address'] as String? ?? '',
       destination: dropoff['formatted_address'] as String? ?? '',
-      originLat: (pickup['latitude'] as num?)?.toDouble() ?? -23.5505,
-      originLng: (pickup['longitude'] as num?)?.toDouble() ?? -46.6333,
-      destinationLat: (dropoff['latitude'] as num?)?.toDouble() ?? -23.5505,
-      destinationLng: (dropoff['longitude'] as num?)?.toDouble() ?? -46.6333,
-      scheduledAt: BrazilTime.fromBackend(map['scheduled_datetime'] as String),
+      originLat:
+          (pickup['latitude'] as num?)?.toDouble() ?? AppGeo.luanda.latitude,
+      originLng:
+          (pickup['longitude'] as num?)?.toDouble() ?? AppGeo.luanda.longitude,
+      destinationLat:
+          (dropoff['latitude'] as num?)?.toDouble() ?? AppGeo.luanda.latitude,
+      destinationLng:
+          (dropoff['longitude'] as num?)?.toDouble() ?? AppGeo.luanda.longitude,
+      scheduledAt: AngolaTime.fromBackend(map['scheduled_datetime'] as String),
       isRoundTrip: map['is_round_trip'] as bool? ?? false,
       returnAt: map['return_datetime'] != null
-          ? BrazilTime.fromBackend(map['return_datetime'] as String)
+          ? AngolaTime.fromBackend(map['return_datetime'] as String)
           : null,
       passengerCount: (map['passenger_count'] as num?)?.toInt() ?? 1,
       childrenCount: (map['children_count'] as num?)?.toInt() ?? 0,
@@ -280,9 +332,10 @@ class TripData {
       paymentMethod: map['payment_method'] as String?,
       status: map['status'] as String? ?? 'open',
       finishedAt: map['finished_at'] != null
-          ? BrazilTime.fromBackend(map['finished_at'] as String)
+          ? AngolaTime.fromBackend(map['finished_at'] as String)
           : null,
       rating: rating,
+      passengers: passengers,
       children: children,
       luggage: luggage,
       stops: stops,
@@ -309,8 +362,10 @@ class TripStopData {
     return TripStopData(
       order: (map['stop_order'] as num?)?.toInt() ?? 0,
       address: address['formatted_address'] as String? ?? 'Parada',
-      latitude: (address['latitude'] as num?)?.toDouble() ?? -23.5505,
-      longitude: (address['longitude'] as num?)?.toDouble() ?? -46.6333,
+      latitude:
+          (address['latitude'] as num?)?.toDouble() ?? AppGeo.luanda.latitude,
+      longitude:
+          (address['longitude'] as num?)?.toDouble() ?? AppGeo.luanda.longitude,
     );
   }
 }
@@ -327,14 +382,93 @@ class TripChild {
   );
 }
 
-class TripLuggage {
-  final String size;
-  final int quantity;
+class TripPassenger {
+  final String name;
+  final int? age;
+  final bool needsCarSeat;
+  final int sortOrder;
 
-  const TripLuggage({required this.size, required this.quantity});
+  const TripPassenger({
+    required this.name,
+    this.age,
+    required this.needsCarSeat,
+    required this.sortOrder,
+  });
+
+  bool get isChild => (age != null && age! < 12) || needsCarSeat;
+
+  String get warningLabel {
+    final ageLabel = age == null ? '' : ' de $age anos';
+    final carSeatLabel = needsCarSeat ? ' (levar cadeirinha)' : '';
+    return 'Criança$ageLabel$carSeatLabel';
+  }
+
+  String get detailLabel {
+    final trimmedName = name.trim().isEmpty ? 'Passageiro' : name.trim();
+    final ageLabel = age == null ? '' : ' — $age anos';
+    final carSeatLabel = needsCarSeat ? ' (levar cadeirinha)' : '';
+    return '$trimmedName$ageLabel$carSeatLabel';
+  }
+
+  factory TripPassenger.fromMap(Map<String, dynamic> map) => TripPassenger(
+    name: map['name'] as String? ?? 'Passageiro',
+    age: (map['age'] as num?)?.toInt(),
+    needsCarSeat: map['needs_car_seat'] as bool? ?? false,
+    sortOrder: (map['sort_order'] as num?)?.toInt() ?? 0,
+  );
+}
+
+class TripLuggage {
+  final String type;
+  final String size;
+  final double? weightKg;
+  final int quantity;
+  final int sortOrder;
+
+  const TripLuggage({
+    this.type = 'luggage',
+    required this.size,
+    this.weightKg,
+    required this.quantity,
+    this.sortOrder = 0,
+  });
+
+  String get detailLabel {
+    final typeLabel = switch (type) {
+      'suitcase' => 'Mala',
+      'carry_on' => 'Bagagem de mão',
+      'backpack' => 'Mochila',
+      'stroller' => 'Carrinho de bebê',
+      'wheelchair' => 'Cadeira de rodas',
+      'luggage' => 'Bagagem',
+      _ => type.replaceAll('_', ' '),
+    };
+    final sizeLabel = switch (size) {
+      'small' => 'pequena',
+      'medium' => 'média',
+      'large' => 'grande',
+      'extra_large' => 'extragrande',
+      _ => size.replaceAll('_', ' '),
+    };
+    final weight = weightKg;
+    final weightLabel = weight == null
+        ? ''
+        : ' (${_formatDecimal(weight)} kg${quantity > 1 ? ' cada' : ''})';
+    return '${quantity}x $typeLabel $sizeLabel$weightLabel';
+  }
 
   factory TripLuggage.fromMap(Map<String, dynamic> map) => TripLuggage(
+    type: map['type'] as String? ?? 'luggage',
     size: map['size'] as String? ?? 'small',
+    weightKg: (map['weight_kg'] as num?)?.toDouble(),
     quantity: (map['quantity'] as num?)?.toInt() ?? 1,
+    sortOrder: (map['sort_order'] as num?)?.toInt() ?? 0,
   );
+}
+
+String _formatDecimal(double value) {
+  final text = value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toStringAsFixed(1);
+  return text.replaceAll('.', ',');
 }
